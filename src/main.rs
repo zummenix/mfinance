@@ -95,9 +95,19 @@ fn add_entry(
 
     let total_after: Decimal = records_from_file(file_path)?.iter().map(|r| r.amount).sum();
 
-    println!("       {}", total_before);
-    println!("       {}", total_after - total_before);
-    println!("Total: {}", total_after);
+    let total_before_line = format!("{total_before:.2}");
+    let diff_line = format!("{:.2}", (total_after - total_before));
+    let total_after_line = format!("Total: {total_after:.2}");
+
+    let max_len = [&total_before_line, &diff_line, &total_after_line]
+        .iter()
+        .map(|s| s.len())
+        .max()
+        .unwrap();
+
+    println!("{:>max_len$}", total_before_line);
+    println!("{:>max_len$}", diff_line);
+    println!("{:>max_len$}", total_after_line);
 
     Ok(())
 }
