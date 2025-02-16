@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "mfinance")]
-#[command(about = "A simple financial tool for managing CSV entries", long_about = None)]
+#[command(version, about = "A simple financial tool for managing CSV entries", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -29,7 +29,8 @@ enum Commands {
     /// Generate a report for a specific period
     Report {
         /// Period to report on (e.g., "2024" or "2024-02")
-        period: String,
+        #[arg(short, long)]
+        period: Option<String>,
         /// Path to the CSV file
         file: PathBuf,
     },
@@ -50,8 +51,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             add_entry(&file, &date, amount)?;
         }
         Commands::Report { period, file } => {
-            let total = generate_report(&file, &period)?;
-            println!("Total amount for {}: {}", period, total);
+            if let Some(period) = period {
+                let total = generate_report(&file, &period)?;
+                println!("Total amount for {}: {}", period, total);
+            } else {
+                let total = generate_report_for_all(&file)?;
+                println!("Total amount: {}", total);
+            }
         }
     }
 
@@ -140,4 +146,9 @@ fn generate_report(file_path: &Path, period: &str) -> Result<Decimal, Box<dyn st
         .sum();
 
     Ok(total)
+}
+
+fn generate_report_for_all(file_path: &Path) -> Result<Decimal, Box<dyn std::error::Error>> {
+    let records = records_from_file(file_path)?;
+    Ok(records.into_iter().map(|r| r.amount).sum())
 }
