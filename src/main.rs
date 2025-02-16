@@ -53,10 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Report { period, file } => {
             if let Some(period) = period {
                 let total = generate_report(&file, &period)?;
-                println!("Total amount for {}: {}", period, total);
+                println!("Total amount for {period}: {total}");
             } else {
                 let total = generate_report_for_all(&file)?;
-                println!("Total amount: {}", total);
+                println!("Total amount: {total}");
             }
         }
     }
@@ -111,9 +111,9 @@ fn add_entry(
         .max()
         .unwrap();
 
-    println!("{:>max_len$}", total_before_line);
-    println!("{:>max_len$}", diff_line);
-    println!("{:>max_len$}", total_after_line);
+    println!("{total_before_line:>max_len$}");
+    println!("{diff_line:>max_len$}");
+    println!("{total_after_line:>max_len$}");
 
     Ok(())
 }
