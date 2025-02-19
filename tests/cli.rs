@@ -78,6 +78,10 @@ fn report_without_period() {
     success: true
     exit_code: 0
     ----- stdout -----
+      2024-09-11:   700.00
+      2024-10-01:   200.00
+      2024-10-02:   300.42
+      2025-01-01:    10.00
     Total amount: 1 210.42
 
     ----- stderr -----
@@ -94,10 +98,29 @@ fn report_period_year() {
     success: true
     exit_code: 0
     ----- stdout -----
+               2024-09-11:   700.00
+               2024-10-01:   200.00
+               2024-10-02:   300.42
     Total amount for 2024: 1 200.42
 
     ----- stderr -----
     ");
+}
+
+#[test]
+fn report_period_year_no_records() {
+    let csv_file = TempCsvFile::new();
+    csv_file.setup_test_content();
+
+    let args = ReportArgs::new().period("2020");
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Error: "No records for the given period: 2020"
+    "#);
 }
 
 #[test]
@@ -110,10 +133,43 @@ fn report_period_year_month() {
     success: true
     exit_code: 0
     ----- stdout -----
+                  2024-10-01: 200.00
+                  2024-10-02: 300.42
     Total amount for 2024-10: 500.42
 
     ----- stderr -----
     ");
+}
+
+#[test]
+fn report_period_year_month_no_records() {
+    let csv_file = TempCsvFile::new();
+    csv_file.setup_test_content();
+
+    let args = ReportArgs::new().period("2020-01");
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Error: "No records for the given period: 2020-01"
+    "#);
+}
+
+#[test]
+fn report_no_file() {
+    let csv_file = TempCsvFile::new();
+
+    let args = ReportArgs::new();
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Error: "No records"
+    "#);
 }
 
 #[test]
