@@ -71,7 +71,7 @@ fn add_entry(
     date: &str,
     amount: Decimal,
 ) -> Result<NewEntryInfo, main_error::MainError> {
-    let mut records = records_from_file(file_path)?;
+    let mut records = records_from_file(file_path).unwrap_or_default();
     let total_before: Decimal = records.iter().map(|r| r.amount).sum();
 
     let new_record = Record {
@@ -132,13 +132,14 @@ impl Display for NewEntryInfo {
 }
 
 fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> {
-    let records = if path.exists() {
-        let mut rdr = ReaderBuilder::new().delimiter(b';').from_path(path)?;
-        rdr.deserialize::<Record>().collect::<Result<Vec<_>, _>>()?
-    } else {
-        vec![]
-    };
+    if !path.exists() {
+        return Err(format!("File '{}' does not exist", path.to_string_lossy()).into());
+    }
 
+    let mut reader = ReaderBuilder::new().delimiter(b';').from_path(path)?;
+    let records = reader
+        .deserialize::<Record>()
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(records)
 }
 

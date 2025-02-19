@@ -159,7 +159,24 @@ fn report_period_year_month_no_records() {
 
 #[test]
 fn report_no_file() {
+    let mut csv_file = TempCsvFile::new();
+    csv_file.setup_insta_filter();
+
+    let args = ReportArgs::new();
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Error: File '[TEMP_DIR]/test.csv' does not exist
+    ");
+}
+
+#[test]
+fn report_no_records() {
     let csv_file = TempCsvFile::new();
+    csv_file.setup_empty_test_content();
 
     let args = ReportArgs::new();
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
@@ -241,13 +258,22 @@ impl ReportArgs {
 
 struct TempCsvFile {
     tempdir: temp_dir::TempDir,
+    #[allow(dyn_drop)]
+    insta_settings_bind_drop_guard: Option<Box<dyn Drop>>,
 }
 
 impl TempCsvFile {
     fn new() -> Self {
         TempCsvFile {
             tempdir: temp_dir::TempDir::with_prefix("mfinance-").unwrap(),
+            insta_settings_bind_drop_guard: None,
         }
+    }
+
+    fn setup_insta_filter(&mut self) {
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(&self.tempdir.path().to_string_lossy(), "[TEMP_DIR]");
+        self.insta_settings_bind_drop_guard = Some(Box::new(settings.bind_to_scope()));
     }
 
     fn path(&self) -> PathBuf {
@@ -260,6 +286,10 @@ impl TempCsvFile {
             "date;amount\n2024-09-11;700\n2024-10-01;-200\n2024-10-02;3000.42\n2025-01-01;10",
         )
         .expect("write test.csv");
+    }
+
+    fn setup_empty_test_content(&self) {
+        fs::write(self.path(), "date;amount\n").expect("write empty test.csv");
     }
 
     fn content(&self) -> String {
