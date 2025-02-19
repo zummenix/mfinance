@@ -43,7 +43,7 @@ struct Record {
     amount: Decimal,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -70,7 +70,7 @@ fn add_entry(
     file_path: &Path,
     date: &str,
     amount: Decimal,
-) -> Result<NewEntryInfo, Box<dyn std::error::Error>> {
+) -> Result<NewEntryInfo, main_error::MainError> {
     let mut records = records_from_file(file_path)?;
     let total_before: Decimal = records.iter().map(|r| r.amount).sum();
 
@@ -131,7 +131,7 @@ impl Display for NewEntryInfo {
     }
 }
 
-fn records_from_file(path: &Path) -> Result<Vec<Record>, Box<dyn std::error::Error>> {
+fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> {
     let records = if path.exists() {
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_path(path)?;
         rdr.deserialize::<Record>().collect::<Result<Vec<_>, _>>()?
@@ -142,7 +142,7 @@ fn records_from_file(path: &Path) -> Result<Vec<Record>, Box<dyn std::error::Err
     Ok(records)
 }
 
-fn generate_report(file_path: &Path, period: &str) -> Result<Report, Box<dyn std::error::Error>> {
+fn generate_report(file_path: &Path, period: &str) -> Result<Report, main_error::MainError> {
     let records: Vec<Record> = records_from_file(file_path)?
         .into_iter()
         .filter(|r| {
@@ -165,7 +165,7 @@ fn generate_report(file_path: &Path, period: &str) -> Result<Report, Box<dyn std
     })
 }
 
-fn generate_report_for_all(file_path: &Path) -> Result<Report, Box<dyn std::error::Error>> {
+fn generate_report_for_all(file_path: &Path) -> Result<Report, main_error::MainError> {
     let records = records_from_file(file_path)?;
     if records.is_empty() {
         return Err(String::from("No records").into());
