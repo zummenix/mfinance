@@ -49,7 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
             let date = date.unwrap_or_else(|| chrono::Local::now().date_naive().to_string());
-            add_entry(&file, &date, amount)?;
+            let info = add_entry(&file, &date, amount)?;
+            print!("{info}");
         }
         Commands::Report { period, file } => {
             if let Some(period) = period {
@@ -69,7 +70,7 @@ fn add_entry(
     file_path: &Path,
     date: &str,
     amount: Decimal,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<NewEntryInfo, Box<dyn std::error::Error>> {
     let mut records = records_from_file(file_path)?;
     let total_before: Decimal = records.iter().map(|r| r.amount).sum();
 
@@ -100,23 +101,34 @@ fn add_entry(
 
     writer.flush()?;
 
-    let total_after: Decimal = records_from_file(file_path)?.iter().map(|r| r.amount).sum();
+    Ok(NewEntryInfo {
+        total_before,
+        total_after: records_from_file(file_path)?.iter().map(|r| r.amount).sum(),
+    })
+}
 
-    let total_before_line = total_before.human_readable();
-    let diff_line = (total_after - total_before).human_readable();
-    let total_after_line = format!("Total: {}", total_after.human_readable());
+struct NewEntryInfo {
+    total_before: Decimal,
+    total_after: Decimal,
+}
 
-    let max_len = [&total_before_line, &diff_line, &total_after_line]
-        .iter()
-        .map(|s| s.len())
-        .max()
-        .unwrap();
+impl Display for NewEntryInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total_before_line = self.total_before.human_readable();
+        let diff_line = (self.total_after - self.total_before).human_readable();
+        let total_after_line = format!("Total: {}", self.total_after.human_readable());
 
-    println!("{total_before_line:>max_len$}");
-    println!("{diff_line:>max_len$}");
-    println!("{total_after_line:>max_len$}");
+        let max_len = [&total_before_line, &diff_line, &total_after_line]
+            .iter()
+            .map(|s| s.len())
+            .max()
+            .unwrap();
 
-    Ok(())
+        writeln!(f, "{total_before_line:>max_len$}")?;
+        writeln!(f, "{diff_line:>max_len$}")?;
+        writeln!(f, "{total_after_line:>max_len$}")?;
+        Ok(())
+    }
 }
 
 fn records_from_file(path: &Path) -> Result<Vec<Record>, Box<dyn std::error::Error>> {
