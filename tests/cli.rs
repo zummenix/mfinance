@@ -33,9 +33,9 @@ fn new_entry_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           1 210.42
+           3 510.42
               42.42
-    Total: 1 252.84
+    Total: 3 552.84
 
     ----- stderr -----
     ");
@@ -51,9 +51,9 @@ fn new_entry_with_date_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           1 210.42
+           3 510.42
               42.42
-    Total: 1 252.84
+    Total: 3 552.84
 
     ----- stderr -----
     ");
@@ -62,8 +62,8 @@ fn new_entry_with_date_into_existing_file() {
     date;amount
     2024-09-11;700
     2024-09-12;42.42
-    2024-10-01;200
-    2024-10-02;300.42
+    2024-10-01;-200
+    2024-10-02;3000.42
     2025-01-01;10
     ");
 }
@@ -79,10 +79,10 @@ fn report_without_period() {
     exit_code: 0
     ----- stdout -----
       2024-09-11:   700.00
-      2024-10-01:   200.00
-      2024-10-02:   300.42
+      2024-10-01:  -200.00
+      2024-10-02: 3 000.42
       2025-01-01:    10.00
-    Total amount: 1 210.42
+    Total amount: 3 510.42
 
     ----- stderr -----
     ");
@@ -99,9 +99,9 @@ fn report_period_year() {
     exit_code: 0
     ----- stdout -----
                2024-09-11:   700.00
-               2024-10-01:   200.00
-               2024-10-02:   300.42
-    Total amount for 2024: 1 200.42
+               2024-10-01:  -200.00
+               2024-10-02: 3 000.42
+    Total amount for 2024: 3 500.42
 
     ----- stderr -----
     ");
@@ -133,9 +133,9 @@ fn report_period_year_month() {
     success: true
     exit_code: 0
     ----- stdout -----
-                  2024-10-01: 200.00
-                  2024-10-02: 300.42
-    Total amount for 2024-10: 500.42
+                  2024-10-01:  -200.00
+                  2024-10-02: 3 000.42
+    Total amount for 2024-10: 2 800.42
 
     ----- stderr -----
     ");
@@ -257,7 +257,7 @@ impl TempCsvFile {
     fn setup_test_content(&self) {
         fs::write(
             self.path(),
-            "date;amount\n2024-09-11;700\n2024-10-01;200\n2024-10-02;300.42\n2025-01-01;10",
+            "date;amount\n2024-09-11;700\n2024-10-01;-200\n2024-10-02;3000.42\n2025-01-01;10",
         )
         .expect("write test.csv");
     }
