@@ -9,8 +9,9 @@ csv = "1.2"
 rust_decimal = "1.24"
 chrono = "0.4"
 serde = { version = "1.0.217", features = ["derive"] }
+main_error = "0.1.2"
 
 [dev-dependencies]
-insta = "1.42.1"
+insta = { version = "1.42.1", features = ["filters"] }
 insta-cmd = "0.6.0"
 temp-dir = "0.1.14"
