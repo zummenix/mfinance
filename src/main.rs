@@ -2,6 +2,7 @@ use chrono::{Datelike, NaiveDate};
 use clap::{Parser, Subcommand};
 use csv::{ReaderBuilder, WriterBuilder};
 use rust_decimal::Decimal;
+use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -52,11 +53,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Report { period, file } => {
             if let Some(period) = period {
-                let total = generate_report(&file, &period)?.human_readable();
-                println!("Total amount for {period}: {total}");
+                let report = generate_report(&file, &period)?;
+                print!("{report}");
             } else {
-                let total = generate_report_for_all(&file)?.human_readable();
-                println!("Total amount: {total}");
+                let report = generate_report_for_all(&file)?;
+                print!("{report}");
             }
         }
     }
@@ -129,10 +130,8 @@ fn records_from_file(path: &Path) -> Result<Vec<Record>, Box<dyn std::error::Err
     Ok(records)
 }
 
-fn generate_report(file_path: &Path, period: &str) -> Result<Decimal, Box<dyn std::error::Error>> {
-    let records = records_from_file(file_path)?;
-
-    let total = records
+fn generate_report(file_path: &Path, period: &str) -> Result<Report, Box<dyn std::error::Error>> {
+    let records: Vec<Record> = records_from_file(file_path)?
         .into_iter()
         .filter(|r| {
             let record_date = NaiveDate::parse_from_str(&r.date, "%Y-%m-%d").unwrap();
@@ -142,15 +141,64 @@ fn generate_report(file_path: &Path, period: &str) -> Result<Decimal, Box<dyn st
                 _ => false,
             }
         })
-        .map(|r| r.amount)
-        .sum();
+        .collect();
 
-    Ok(total)
+    if records.is_empty() {
+        return Err(format!("No records for the given period: {period}").into());
+    }
+
+    Ok(Report {
+        period: Some(String::from(period)),
+        records,
+    })
 }
 
-fn generate_report_for_all(file_path: &Path) -> Result<Decimal, Box<dyn std::error::Error>> {
+fn generate_report_for_all(file_path: &Path) -> Result<Report, Box<dyn std::error::Error>> {
     let records = records_from_file(file_path)?;
-    Ok(records.into_iter().map(|r| r.amount).sum())
+    if records.is_empty() {
+        return Err(String::from("No records").into());
+    }
+    Ok(Report {
+        period: None,
+        records,
+    })
+}
+
+struct Report {
+    period: Option<String>,
+    records: Vec<Record>,
+}
+
+impl Display for Report {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let records: Vec<(String, String)> = self
+            .records
+            .iter()
+            .map(|record| (format!("{}:", record.date), record.amount.human_readable()))
+            .collect();
+
+        let final_line_prefix: String = if let Some(period) = self.period.as_ref() {
+            format!("Total amount for {period}:")
+        } else {
+            "Total amount:".to_string()
+        };
+        let total: Decimal = self.records.iter().map(|record| record.amount).sum();
+        let final_line_suffix: String = total.human_readable();
+        let mut max_prefix_len = records.iter().map(|tuple| tuple.0.len()).max().unwrap();
+        let mut max_suffix_len = records.iter().map(|tuple| tuple.1.len()).max().unwrap();
+        max_prefix_len = max_prefix_len.max(final_line_prefix.len());
+        max_suffix_len = max_suffix_len.max(final_line_suffix.len()) + 1;
+
+        for (prefix, suffix) in records {
+            write!(f, "{prefix:>max_prefix_len$}")?;
+            writeln!(f, "{suffix:>max_suffix_len$}")?;
+        }
+
+        write!(f, "{final_line_prefix:>max_prefix_len$}")?;
+        writeln!(f, "{final_line_suffix:>max_suffix_len$}")?;
+
+        Ok(())
+    }
 }
 
 trait HumanReadable {
