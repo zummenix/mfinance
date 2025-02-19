@@ -33,9 +33,9 @@ fn new_entry_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           1210.42
-             42.42
-    Total: 1252.84
+           1 210.42
+              42.42
+    Total: 1 252.84
 
     ----- stderr -----
     ");
@@ -51,9 +51,9 @@ fn new_entry_with_date_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           1210.42
-             42.42
-    Total: 1252.84
+           1 210.42
+              42.42
+    Total: 1 252.84
 
     ----- stderr -----
     ");
@@ -78,7 +78,7 @@ fn report_without_period() {
     success: true
     exit_code: 0
     ----- stdout -----
-    Total amount: 1210.42
+    Total amount: 1 210.42
 
     ----- stderr -----
     ");
@@ -94,7 +94,7 @@ fn report_period_year() {
     success: true
     exit_code: 0
     ----- stdout -----
-    Total amount for 2024: 1200.42
+    Total amount for 2024: 1 200.42
 
     ----- stderr -----
     ");
