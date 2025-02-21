@@ -69,6 +69,22 @@ fn new_entry_with_date_into_existing_file() {
 }
 
 #[test]
+fn new_entry_with_invalid_date_error() {
+    let csv_file = TempCsvFile::new();
+    csv_file.setup_test_content();
+
+    let args = NewEntryArgs::with_amount("42.42").date("2024-12");
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Error: failed to parse input date: premature end of input
+    ");
+}
+
+#[test]
 fn report_without_period() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
@@ -108,7 +124,7 @@ fn report_period_year() {
 }
 
 #[test]
-fn report_period_year_no_records() {
+fn report_period_year_no_records_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
@@ -142,7 +158,7 @@ fn report_period_year_month() {
 }
 
 #[test]
-fn report_period_year_month_no_records() {
+fn report_period_year_month_no_records_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
@@ -158,7 +174,7 @@ fn report_period_year_month_no_records() {
 }
 
 #[test]
-fn report_no_file() {
+fn report_no_file_error() {
     let mut csv_file = TempCsvFile::new();
     csv_file.setup_insta_filter();
 
@@ -174,7 +190,7 @@ fn report_no_file() {
 }
 
 #[test]
-fn report_no_records() {
+fn report_no_records_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_empty_test_content();
 

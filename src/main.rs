@@ -48,8 +48,13 @@ fn main() -> Result<(), main_error::MainError> {
 
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
-            let date = date.unwrap_or_else(|| chrono::Local::now().date_naive().to_string());
-            let info = add_entry(&file, &date, amount)?;
+            let date: NaiveDate = match date {
+                Some(date) => date
+                    .parse()
+                    .map_err(|err| format!("failed to parse input date: {err}"))?,
+                None => chrono::Local::now().date_naive(),
+            };
+            let info = add_entry(&file, date, amount)?;
             print!("{info}");
         }
         Commands::Report { period, file } => {
@@ -68,7 +73,7 @@ fn main() -> Result<(), main_error::MainError> {
 
 fn add_entry(
     file_path: &Path,
-    date: &str,
+    date: NaiveDate,
     amount: Decimal,
 ) -> Result<NewEntryInfo, main_error::MainError> {
     let mut records = records_from_file(file_path).unwrap_or_default();
