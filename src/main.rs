@@ -77,7 +77,7 @@ fn add_entry(
     date: NaiveDate,
     amount: Decimal,
 ) -> Result<NewEntryInfo, main_error::MainError> {
-    let mut records = records_from_file(file_path).unwrap_or_default();
+    let records = records_from_file(file_path).unwrap_or_default();
     let total_before: Decimal = records.iter().map(|r| r.amount).sum();
 
     let new_record = Record {
@@ -85,26 +85,19 @@ fn add_entry(
         amount,
     };
 
-    // Insert the new record in the correct position to keep the list sorted by date
-    let pos = records
-        .iter()
-        .position(|r| r.date > new_record.date)
-        .unwrap_or(records.len());
-    records.insert(pos, new_record);
+    // Write to the end of the file.
+    let mut writer = WriterBuilder::new()
+        .delimiter(b';')
+        .has_headers(records.is_empty())
+        .from_writer(
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(file_path)?,
+        );
 
-    // Write back to the file
-    let mut writer = WriterBuilder::new().delimiter(b';').from_writer(
-        OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(file_path)?,
-    );
-
-    for record in records {
-        writer.serialize(record)?;
-    }
-
+    writer.serialize(new_record)?;
     writer.flush()?;
 
     Ok(NewEntryInfo {
@@ -150,34 +143,39 @@ fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> 
 }
 
 fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_error::MainError> {
-    let records: Vec<Record> = records_from_file(file_path)?
+    let mut records: Vec<Record> = records_from_file(file_path)?
         .into_iter()
         .filter(|r| r.date.starts_with(date_filter))
         .collect();
+
+    records.sort_by(|a, b| a.date.cmp(&b.date));
 
     if records.is_empty() {
         return Err(format!("No records for the given filter: '{date_filter}'").into());
     }
 
     Ok(Report {
-        period: Some(String::from(date_filter)),
+        filter: Some(String::from(date_filter)),
         records,
     })
 }
 
 fn generate_report_for_all(file_path: &Path) -> Result<Report, main_error::MainError> {
-    let records = records_from_file(file_path)?;
+    let mut records = records_from_file(file_path)?;
+    records.sort_by(|a, b| a.date.cmp(&b.date));
+
     if records.is_empty() {
         return Err(String::from("No records").into());
     }
+
     Ok(Report {
-        period: None,
+        filter: None,
         records,
     })
 }
 
 struct Report {
-    period: Option<String>,
+    filter: Option<String>,
     records: Vec<Record>,
 }
 
@@ -189,8 +187,8 @@ impl Display for Report {
             .map(|record| (format!("{}:", record.date), record.amount.human_readable()))
             .collect();
 
-        let final_line_prefix: String = if let Some(period) = self.period.as_ref() {
-            format!("Total amount for {period}:")
+        let final_line_prefix: String = if let Some(filter) = self.filter.as_ref() {
+            format!("Total amount for filter '{filter}':")
         } else {
             "Total amount:".to_string()
         };
