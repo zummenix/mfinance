@@ -135,7 +135,7 @@ fn report_period_year_no_records_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No records for the given period: 2020
+    Error: No records for the given filter: '2020'
     ");
 }
 
@@ -169,7 +169,7 @@ fn report_period_year_month_no_records_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No records for the given period: 2020-01
+    Error: No records for the given filter: '2020-01'
     ");
 }
 
@@ -248,24 +248,24 @@ impl NewEntryArgs {
 }
 
 struct ReportArgs {
-    period: Option<&'static str>,
+    filter: Option<&'static str>,
 }
 
 impl ReportArgs {
     fn new() -> Self {
-        ReportArgs { period: None }
+        ReportArgs { filter: None }
     }
 
     fn period(mut self, period: &'static str) -> Self {
-        self.period = Some(period);
+        self.filter = Some(period);
         self
     }
 
     fn cmd(&self, file: &Path) -> Command {
         let mut cmd = mfinance();
         cmd.arg("report");
-        if let Some(period) = self.period {
-            cmd.arg(format!("-p={period}"));
+        if let Some(filter) = self.filter {
+            cmd.arg(format!("-f={filter}"));
         }
         cmd.arg(file.as_os_str());
         cmd
