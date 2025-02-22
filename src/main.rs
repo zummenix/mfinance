@@ -1,4 +1,4 @@
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use csv::{ReaderBuilder, WriterBuilder};
 use rust_decimal::Decimal;
@@ -29,9 +29,10 @@ enum Commands {
     },
     /// Generate a report for a specific period
     Report {
-        /// Period to report on (e.g., "2024" or "2024-02")
+        /// Filter records by date. Currently, only `starts_with` filter is supported.
+        /// For example, you can use "2024" to filter out a year or "2024-02" for a month.
         #[arg(short, long)]
-        period: Option<String>,
+        filter: Option<String>,
         /// Path to the CSV file
         file: PathBuf,
     },
@@ -57,9 +58,9 @@ fn main() -> Result<(), main_error::MainError> {
             let info = add_entry(&file, date, amount)?;
             print!("{info}");
         }
-        Commands::Report { period, file } => {
-            if let Some(period) = period {
-                let report = generate_report(&file, &period)?;
+        Commands::Report { filter, file } => {
+            if let Some(filter) = filter {
+                let report = generate_report(&file, &filter)?;
                 print!("{report}");
             } else {
                 let report = generate_report_for_all(&file)?;
@@ -148,25 +149,18 @@ fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> 
     Ok(records)
 }
 
-fn generate_report(file_path: &Path, period: &str) -> Result<Report, main_error::MainError> {
+fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_error::MainError> {
     let records: Vec<Record> = records_from_file(file_path)?
         .into_iter()
-        .filter(|r| {
-            let record_date = NaiveDate::parse_from_str(&r.date, "%Y-%m-%d").unwrap();
-            match period.len() {
-                4 => record_date.year().to_string() == period, // Year
-                7 => record_date.format("%Y-%m").to_string() == period, // Month
-                _ => false,
-            }
-        })
+        .filter(|r| r.date.starts_with(date_filter))
         .collect();
 
     if records.is_empty() {
-        return Err(format!("No records for the given period: {period}").into());
+        return Err(format!("No records for the given filter: '{date_filter}'").into());
     }
 
     Ok(Report {
-        period: Some(String::from(period)),
+        period: Some(String::from(date_filter)),
         records,
     })
 }
