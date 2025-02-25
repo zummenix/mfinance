@@ -21,7 +21,7 @@ enum Commands {
     /// Add a new entry to the CSV file
     NewEntry {
         /// Amount to add
-        #[arg(short, long)]
+        #[arg(short, long, allow_negative_numbers = true)]
         amount: Decimal,
         /// Date of the entry (e.g. 2024-12-12, defaults to today)
         #[arg(short, long)]
