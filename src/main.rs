@@ -6,6 +6,8 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
+const DELIMITER: u8 = b';';
+
 #[derive(Parser)]
 #[command(name = "mfinance")]
 #[command(version, about = "A simple financial tool for managing CSV entries", long_about = None)]
@@ -33,6 +35,11 @@ enum Commands {
         /// For example, you can use "2024" to filter out a year or "2024-02" for a month.
         #[arg(short, long)]
         filter: Option<String>,
+        /// Path to the CSV file
+        file: PathBuf,
+    },
+    /// Sort the entries in the file by date
+    Sort {
         /// Path to the CSV file
         file: PathBuf,
     },
@@ -67,6 +74,18 @@ fn main() -> Result<(), main_error::MainError> {
                 print!("{report}");
             }
         }
+        Commands::Sort { file } => {
+            let mut records = records_from_file(&file)?;
+            records.sort_by(|a, b| a.date.cmp(&b.date));
+            let mut writer = WriterBuilder::new()
+                .delimiter(DELIMITER)
+                .from_writer(OpenOptions::new().write(true).truncate(true).open(&file)?);
+
+            for record in records {
+                writer.serialize(record)?;
+            }
+            writer.flush()?;
+        }
     }
 
     Ok(())
@@ -87,11 +106,10 @@ fn add_entry(
 
     // Write to the end of the file.
     let mut writer = WriterBuilder::new()
-        .delimiter(b';')
+        .delimiter(DELIMITER)
         .has_headers(records.is_empty())
         .from_writer(
             OpenOptions::new()
-                .write(true)
                 .create(true)
                 .append(true)
                 .open(file_path)?,
@@ -135,7 +153,7 @@ fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> 
         return Err(format!("File '{}' does not exist", path.to_string_lossy()).into());
     }
 
-    let mut reader = ReaderBuilder::new().delimiter(b';').from_path(path)?;
+    let mut reader = ReaderBuilder::new().delimiter(DELIMITER).from_path(path)?;
     let records = reader
         .deserialize::<Record>()
         .collect::<Result<Vec<_>, _>>()?;

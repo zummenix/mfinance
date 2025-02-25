@@ -60,8 +60,8 @@ fn new_entry_with_date_into_existing_file() {
 
     assert_snapshot!(csv_file.content(), @r"
     date;amount
-    2024-09-11;700
     2024-10-01;-200
+    2024-09-11;700
     2024-10-02;3000.42
     2025-01-01;10
     2024-09-12;42.42
@@ -206,6 +206,29 @@ fn report_no_records_error() {
 }
 
 #[test]
+fn sort() {
+    let csv_file = TempCsvFile::new();
+    csv_file.setup_test_content();
+
+    let args = SortArgs::new();
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    assert_snapshot!(csv_file.content(), @r"
+    date;amount
+    2024-09-11;700
+    2024-10-01;-200
+    2024-10-02;3000.42
+    2025-01-01;10
+    ");
+}
+
+#[test]
 fn test_version() {
     assert_cmd_snapshot!(mfinance().arg("--version"), @r"
     success: true
@@ -272,6 +295,20 @@ impl ReportArgs {
     }
 }
 
+struct SortArgs;
+
+impl SortArgs {
+    fn new() -> Self {
+        SortArgs
+    }
+
+    fn cmd(&self, file: &Path) -> Command {
+        let mut cmd = mfinance();
+        cmd.arg("sort").arg(file.as_os_str());
+        cmd
+    }
+}
+
 struct TempCsvFile {
     tempdir: temp_dir::TempDir,
     #[allow(dyn_drop)]
@@ -297,9 +334,10 @@ impl TempCsvFile {
     }
 
     fn setup_test_content(&self) {
+        // The content is intentionally unsorted.
         fs::write(
             self.path(),
-            "date;amount\n2024-09-11;700\n2024-10-01;-200\n2024-10-02;3000.42\n2025-01-01;10\n",
+            "date;amount\n2024-10-01;-200\n2024-09-11;700\n2024-10-02;3000.42\n2025-01-01;10\n",
         )
         .expect("write test.csv");
     }
