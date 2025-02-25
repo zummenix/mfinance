@@ -261,9 +261,9 @@ impl NewEntryArgs {
 
     fn cmd(&self, file: &Path) -> Command {
         let mut cmd = mfinance();
-        cmd.arg("new-entry").arg(format!("-a={}", self.amount));
+        cmd.arg("new-entry").arg("--amount").arg(self.amount);
         if let Some(date) = self.date {
-            cmd.arg(format!("-d={}", date));
+            cmd.arg("--date").arg(date);
         }
         cmd.arg(file.as_os_str());
         cmd
@@ -288,7 +288,7 @@ impl ReportArgs {
         let mut cmd = mfinance();
         cmd.arg("report");
         if let Some(filter) = self.filter {
-            cmd.arg(format!("-f={filter}"));
+            cmd.arg("--filter").arg(filter);
         }
         cmd.arg(file.as_os_str());
         cmd
