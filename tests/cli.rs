@@ -33,9 +33,9 @@ fn new_entry_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           3 510.42
+           3 510.42
               42.42
-    Total: 3 552.84
+    Total: 3 552.84
 
     ----- stderr -----
     ");
@@ -51,9 +51,9 @@ fn new_entry_with_date_into_existing_file() {
     success: true
     exit_code: 0
     ----- stdout -----
-           3 510.42
+           3 510.42
               42.42
-    Total: 3 552.84
+    Total: 3 552.84
 
     ----- stderr -----
     ");
@@ -96,9 +96,9 @@ fn report_without_period() {
     ----- stdout -----
       2024-09-11:   700.00
       2024-10-01:  -200.00
-      2024-10-02: 3 000.42
+      2024-10-02: 3 000.42
       2025-01-01:    10.00
-    Total amount: 3 510.42
+    Total amount: 3 510.42
 
     ----- stderr -----
     ");
@@ -116,8 +116,8 @@ fn report_period_year() {
     ----- stdout -----
                         2024-09-11:   700.00
                         2024-10-01:  -200.00
-                        2024-10-02: 3 000.42
-    Total amount for filter '2024': 3 500.42
+                        2024-10-02: 3 000.42
+    Total amount for filter '2024': 3 500.42
 
     ----- stderr -----
     ");
@@ -150,8 +150,8 @@ fn report_period_year_month() {
     exit_code: 0
     ----- stdout -----
                            2024-10-01:  -200.00
-                           2024-10-02: 3 000.42
-    Total amount for filter '2024-10': 2 800.42
+                           2024-10-02: 3 000.42
+    Total amount for filter '2024-10': 2 800.42
 
     ----- stderr -----
     ");

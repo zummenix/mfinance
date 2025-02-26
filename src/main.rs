@@ -137,7 +137,7 @@ impl Display for NewEntryInfo {
 
         let max_len = [&total_before_line, &diff_line, &total_after_line]
             .iter()
-            .map(|s| s.len())
+            .map(|s| s.chars().count())
             .max()
             .unwrap();
 
@@ -212,10 +212,18 @@ impl Display for Report {
         };
         let total: Decimal = self.records.iter().map(|record| record.amount).sum();
         let final_line_suffix: String = total.human_readable();
-        let mut max_prefix_len = records.iter().map(|tuple| tuple.0.len()).max().unwrap();
-        let mut max_suffix_len = records.iter().map(|tuple| tuple.1.len()).max().unwrap();
-        max_prefix_len = max_prefix_len.max(final_line_prefix.len());
-        max_suffix_len = max_suffix_len.max(final_line_suffix.len()) + 1;
+        let mut max_prefix_len = records
+            .iter()
+            .map(|tuple| tuple.0.chars().count())
+            .max()
+            .unwrap();
+        let mut max_suffix_len = records
+            .iter()
+            .map(|tuple| tuple.1.chars().count())
+            .max()
+            .unwrap();
+        max_prefix_len = max_prefix_len.max(final_line_prefix.chars().count());
+        max_suffix_len = max_suffix_len.max(final_line_suffix.chars().count()) + 1;
 
         for (prefix, suffix) in records {
             write!(f, "{prefix:>max_prefix_len$}")?;
@@ -247,7 +255,7 @@ impl HumanReadable for Decimal {
         let mut result = String::new();
         for (i, ch) in decimal_string.char_indices() {
             if group_separator_index == i && group_separator_index < len_till_dot {
-                result.push(' ');
+                result.push('\u{a0}');
                 group_separator_index += 3;
             }
             result.push(ch);
@@ -307,7 +315,7 @@ mod tests {
     fn format_thousands() {
         assert_eq!(
             Decimal::from_f32(1999.99).unwrap().human_readable(),
-            "1 999.99"
+            "1\u{a0}999.99"
         );
     }
 
@@ -315,7 +323,7 @@ mod tests {
     fn format_thousands_negative() {
         assert_eq!(
             Decimal::from_f32(-1999.99).unwrap().human_readable(),
-            "-1 999.99"
+            "-1\u{a0}999.99"
         );
     }
 
@@ -323,7 +331,7 @@ mod tests {
     fn format_ten_thousands() {
         assert_eq!(
             Decimal::from_f32(19999.99).unwrap().human_readable(),
-            "19 999.99"
+            "19\u{a0}999.99"
         );
     }
 
@@ -331,7 +339,7 @@ mod tests {
     fn format_ten_thousands_negative() {
         assert_eq!(
             Decimal::from_f32(-19999.99).unwrap().human_readable(),
-            "-19 999.99"
+            "-19\u{a0}999.99"
         );
     }
 
@@ -339,7 +347,7 @@ mod tests {
     fn format_hundred_thousands() {
         assert_eq!(
             Decimal::from_f64(199999.99).unwrap().human_readable(),
-            "199 999.99"
+            "199\u{a0}999.99"
         );
     }
 
@@ -347,7 +355,7 @@ mod tests {
     fn format_hundred_thousands_negative() {
         assert_eq!(
             Decimal::from_f64(-199999.99).unwrap().human_readable(),
-            "-199 999.99"
+            "-199\u{a0}999.99"
         );
     }
 
@@ -355,7 +363,7 @@ mod tests {
     fn format_million() {
         assert_eq!(
             Decimal::from_f64(1999999.99).unwrap().human_readable(),
-            "1 999 999.99"
+            "1\u{a0}999\u{a0}999.99"
         );
     }
 
@@ -363,7 +371,7 @@ mod tests {
     fn format_million_negative() {
         assert_eq!(
             Decimal::from_f64(-1999999.99).unwrap().human_readable(),
-            "-1 999 999.99"
+            "-1\u{a0}999\u{a0}999.99"
         );
     }
 }
