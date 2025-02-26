@@ -90,7 +90,7 @@ fn report_without_filter() {
     csv_file.setup_test_content();
 
     let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -105,12 +105,36 @@ fn report_without_filter() {
 }
 
 #[test]
+fn report_with_multiple_files() {
+    let csv_file_a = TempCsvFile::new();
+    csv_file_a.setup_test_content();
+
+    let csv_file_b = TempCsvFile::new();
+    csv_file_b.setup_alt_test_content();
+
+    let args = ReportArgs::new();
+    assert_cmd_snapshot!(args.cmd(vec![csv_file_a.path(), csv_file_b.path()].as_slice()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      2023-01-01: -9 999.99
+      2024-09-11:    700.00
+      2024-10-01:   -200.00
+      2024-10-02:  3 000.42
+      2025-01-01:     10.00
+    Total amount: -6 489.57
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn report_filter_year() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
     let args = ReportArgs::new().filter("2024");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -129,7 +153,7 @@ fn report_filter_year_no_entries_error() {
     csv_file.setup_test_content();
 
     let args = ReportArgs::new().filter("2020");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -145,7 +169,7 @@ fn report_filter_year_month() {
     csv_file.setup_test_content();
 
     let args = ReportArgs::new().filter("2024-10");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -163,7 +187,7 @@ fn report_filter_year_month_no_entries_error() {
     csv_file.setup_test_content();
 
     let args = ReportArgs::new().filter("2020-01");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -179,7 +203,7 @@ fn report_no_file_error() {
     csv_file.setup_insta_filter();
 
     let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -195,7 +219,7 @@ fn report_no_entries_error() {
     csv_file.setup_empty_test_content();
 
     let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    assert_cmd_snapshot!(args.cmd(vec![csv_file.path()].as_slice()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -284,13 +308,15 @@ impl ReportArgs {
         self
     }
 
-    fn cmd(&self, file: &Path) -> Command {
+    fn cmd(&self, files: &[PathBuf]) -> Command {
         let mut cmd = cli();
         cmd.arg("report");
         if let Some(filter) = self.filter {
             cmd.arg("--filter").arg(filter);
         }
-        cmd.arg(file.as_os_str());
+        for file in files {
+            cmd.arg(file.as_os_str());
+        }
         cmd
     }
 }
@@ -340,6 +366,11 @@ impl TempCsvFile {
             "date;amount\n2024-10-01;-200\n2024-09-11;700\n2024-10-02;3000.42\n2025-01-01;10\n",
         )
         .expect("write test.csv");
+    }
+
+    fn setup_alt_test_content(&self) {
+        fs::write(self.path(), "date;amount\n2023-01-01;-9999.99\n")
+            .expect("write alternative test.csv");
     }
 
     fn setup_empty_test_content(&self) {

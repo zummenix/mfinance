@@ -29,7 +29,7 @@ enum Commands {
         /// Path to the CSV file
         file: PathBuf,
     },
-    /// Generate a report possibly filtered by date
+    /// Generate a report possibly combining multiple files and filtered by date
     Report {
         /// Filters entries by date
         ///
@@ -40,8 +40,9 @@ enum Commands {
         /// - To filter entries for a specific month, use `2024-02`.
         #[arg(short, long)]
         filter: Option<String>,
-        /// Path to the CSV file
-        file: PathBuf,
+        /// Path to the CSV files
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
     },
     /// Sort the entries in the CSV file by date
     Sort {
@@ -70,11 +71,11 @@ fn main() -> Result<(), main_error::MainError> {
             let info = add_entry(&file, date, amount)?;
             print!("{info}");
         }
-        Commands::Report { filter, file } => {
+        Commands::Report { filter, files } => {
             let report = if let Some(filter) = filter {
-                generate_report(&file, &filter)?
+                generate_report(files.as_slice(), &filter)?
             } else {
-                generate_report_for_all(&file)?
+                generate_report_for_all(files.as_slice())?
             };
             print!("{report}");
         }
@@ -167,11 +168,20 @@ fn entries_from_file(path: &Path) -> Result<Vec<Entry>, main_error::MainError> {
     Ok(entries)
 }
 
-fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_error::MainError> {
-    let mut entries: Vec<Entry> = entries_from_file(file_path)?
-        .into_iter()
-        .filter(|entry| entry.date.starts_with(date_filter))
-        .collect();
+fn generate_report(
+    file_paths: &[PathBuf],
+    date_filter: &str,
+) -> Result<Report, main_error::MainError> {
+    let mut entries: Vec<Entry> = vec![];
+    for file_path in file_paths {
+        entries.extend(
+            entries_from_file(file_path)?
+                .into_iter()
+                .filter(|entry| entry.date.starts_with(date_filter))
+                .collect::<Vec<_>>(),
+        );
+    }
+
     if entries.is_empty() {
         return Err(format!("No entries for the given filter: '{date_filter}'").into());
     }
@@ -183,8 +193,12 @@ fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_e
     })
 }
 
-fn generate_report_for_all(file_path: &Path) -> Result<Report, main_error::MainError> {
-    let mut entries = entries_from_file(file_path)?;
+fn generate_report_for_all(file_paths: &[PathBuf]) -> Result<Report, main_error::MainError> {
+    let mut entries: Vec<Entry> = vec![];
+    for file_path in file_paths {
+        entries.extend(entries_from_file(file_path)?);
+    }
+
     if entries.is_empty() {
         return Err(String::from("No entries").into());
     }
