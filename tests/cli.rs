@@ -80,12 +80,12 @@ fn new_entry_with_invalid_date_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: failed to parse input date: premature end of input
+    Error: failed to parse date, premature end of input
     ");
 }
 
 #[test]
-fn report_without_period() {
+fn report_without_filter() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
@@ -105,11 +105,11 @@ fn report_without_period() {
 }
 
 #[test]
-fn report_period_year() {
+fn report_filter_year() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
-    let args = ReportArgs::new().period("2024");
+    let args = ReportArgs::new().filter("2024");
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
     success: true
     exit_code: 0
@@ -124,27 +124,27 @@ fn report_period_year() {
 }
 
 #[test]
-fn report_period_year_no_records_error() {
+fn report_filter_year_no_entries_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
-    let args = ReportArgs::new().period("2020");
+    let args = ReportArgs::new().filter("2020");
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Error: No records for the given filter: '2020'
+    Error: No entries for the given filter: '2020'
     ");
 }
 
 #[test]
-fn report_period_year_month() {
+fn report_filter_year_month() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
-    let args = ReportArgs::new().period("2024-10");
+    let args = ReportArgs::new().filter("2024-10");
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
     success: true
     exit_code: 0
@@ -158,18 +158,18 @@ fn report_period_year_month() {
 }
 
 #[test]
-fn report_period_year_month_no_records_error() {
+fn report_filter_year_month_no_entries_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
 
-    let args = ReportArgs::new().period("2020-01");
+    let args = ReportArgs::new().filter("2020-01");
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Error: No records for the given filter: '2020-01'
+    Error: No entries for the given filter: '2020-01'
     ");
 }
 
@@ -190,7 +190,7 @@ fn report_no_file_error() {
 }
 
 #[test]
-fn report_no_records_error() {
+fn report_no_entries_error() {
     let csv_file = TempCsvFile::new();
     csv_file.setup_empty_test_content();
 
@@ -201,7 +201,7 @@ fn report_no_records_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No records
+    Error: No entries
     ");
 }
 
@@ -230,7 +230,7 @@ fn sort() {
 
 #[test]
 fn test_version() {
-    assert_cmd_snapshot!(mfinance().arg("--version"), @r"
+    assert_cmd_snapshot!(cli().arg("--version"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -240,7 +240,7 @@ fn test_version() {
     ");
 }
 
-fn mfinance() -> Command {
+fn cli() -> Command {
     Command::new(get_cargo_bin("mfinance"))
 }
 
@@ -260,7 +260,7 @@ impl NewEntryArgs {
     }
 
     fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = mfinance();
+        let mut cmd = cli();
         cmd.arg("new-entry").arg("--amount").arg(self.amount);
         if let Some(date) = self.date {
             cmd.arg("--date").arg(date);
@@ -279,13 +279,13 @@ impl ReportArgs {
         ReportArgs { filter: None }
     }
 
-    fn period(mut self, period: &'static str) -> Self {
-        self.filter = Some(period);
+    fn filter(mut self, filter: &'static str) -> Self {
+        self.filter = Some(filter);
         self
     }
 
     fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = mfinance();
+        let mut cmd = cli();
         cmd.arg("report");
         if let Some(filter) = self.filter {
             cmd.arg("--filter").arg(filter);
@@ -303,7 +303,7 @@ impl SortArgs {
     }
 
     fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = mfinance();
+        let mut cmd = cli();
         cmd.arg("sort").arg(file.as_os_str());
         cmd
     }
