@@ -18,9 +18,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add a new entry to the CSV file
+    /// Add a new entry with amount to the CSV file
     NewEntry {
-        /// Amount to add
+        /// Amount to add (e.g. -999.99)
         #[arg(short, long, allow_negative_numbers = true)]
         amount: Decimal,
         /// Date of the entry (e.g. 2024-12-12, defaults to today)
@@ -29,16 +29,21 @@ enum Commands {
         /// Path to the CSV file
         file: PathBuf,
     },
-    /// Generate a report for a specific period
+    /// Generate a report possibly filtered by date
     Report {
-        /// Filter records by date. Currently, only `starts_with` filter is supported.
-        /// For example, you can use "2024" to filter out a year or "2024-02" for a month.
+        /// Filters entries by date
+        ///
+        /// Currently, only the `starts_with` filter is supported.
+        ///
+        /// # Examples
+        /// - To filter entries for a specific year, use `2024`.
+        /// - To filter entries for a specific month, use `2024-02`.
         #[arg(short, long)]
         filter: Option<String>,
         /// Path to the CSV file
         file: PathBuf,
     },
-    /// Sort the entries in the file by date
+    /// Sort the entries in the CSV file by date
     Sort {
         /// Path to the CSV file
         file: PathBuf,
@@ -46,7 +51,7 @@ enum Commands {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct Record {
+struct Entry {
     date: String,
     amount: Decimal,
 }
@@ -56,33 +61,32 @@ fn main() -> Result<(), main_error::MainError> {
 
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
-            let date: NaiveDate = match date {
-                Some(date) => date
-                    .parse()
-                    .map_err(|err| format!("failed to parse input date: {err}"))?,
-                None => chrono::Local::now().date_naive(),
+            let date: NaiveDate = if let Some(date) = date {
+                date.parse()
+                    .map_err(|err| format!("failed to parse date, {err}"))?
+            } else {
+                chrono::Local::now().date_naive()
             };
             let info = add_entry(&file, date, amount)?;
             print!("{info}");
         }
         Commands::Report { filter, file } => {
-            if let Some(filter) = filter {
-                let report = generate_report(&file, &filter)?;
-                print!("{report}");
+            let report = if let Some(filter) = filter {
+                generate_report(&file, &filter)?
             } else {
-                let report = generate_report_for_all(&file)?;
-                print!("{report}");
-            }
+                generate_report_for_all(&file)?
+            };
+            print!("{report}");
         }
         Commands::Sort { file } => {
-            let mut records = records_from_file(&file)?;
-            records.sort_by(|a, b| a.date.cmp(&b.date));
+            let mut entries = entries_from_file(&file)?;
+            entries.sort_by(|a, b| a.date.cmp(&b.date));
             let mut writer = WriterBuilder::new()
                 .delimiter(DELIMITER)
                 .from_writer(OpenOptions::new().write(true).truncate(true).open(&file)?);
 
-            for record in records {
-                writer.serialize(record)?;
+            for entry in entries {
+                writer.serialize(entry)?;
             }
             writer.flush()?;
         }
@@ -96,10 +100,10 @@ fn add_entry(
     date: NaiveDate,
     amount: Decimal,
 ) -> Result<NewEntryInfo, main_error::MainError> {
-    let records = records_from_file(file_path).unwrap_or_default();
-    let total_before: Decimal = records.iter().map(|r| r.amount).sum();
+    let entries = entries_from_file(file_path).unwrap_or_default();
+    let total_before: Decimal = entries.iter().map(|entry| entry.amount).sum();
 
-    let new_record = Record {
+    let new_entry = Entry {
         date: date.to_string(),
         amount,
     };
@@ -107,7 +111,7 @@ fn add_entry(
     // Write to the end of the file.
     let mut writer = WriterBuilder::new()
         .delimiter(DELIMITER)
-        .has_headers(records.is_empty())
+        .has_headers(entries.is_empty())
         .from_writer(
             OpenOptions::new()
                 .create(true)
@@ -115,12 +119,15 @@ fn add_entry(
                 .open(file_path)?,
         );
 
-    writer.serialize(new_record)?;
+    writer.serialize(new_entry)?;
     writer.flush()?;
 
     Ok(NewEntryInfo {
         total_before,
-        total_after: records_from_file(file_path)?.iter().map(|r| r.amount).sum(),
+        total_after: entries_from_file(file_path)?
+            .iter()
+            .map(|entry| entry.amount)
+            .sum(),
     })
 }
 
@@ -148,61 +155,58 @@ impl Display for NewEntryInfo {
     }
 }
 
-fn records_from_file(path: &Path) -> Result<Vec<Record>, main_error::MainError> {
+fn entries_from_file(path: &Path) -> Result<Vec<Entry>, main_error::MainError> {
     if !path.exists() {
         return Err(format!("File '{}' does not exist", path.to_string_lossy()).into());
     }
 
     let mut reader = ReaderBuilder::new().delimiter(DELIMITER).from_path(path)?;
-    let records = reader
-        .deserialize::<Record>()
+    let entries = reader
+        .deserialize::<Entry>()
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(records)
+    Ok(entries)
 }
 
 fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_error::MainError> {
-    let mut records: Vec<Record> = records_from_file(file_path)?
+    let mut entries: Vec<Entry> = entries_from_file(file_path)?
         .into_iter()
-        .filter(|r| r.date.starts_with(date_filter))
+        .filter(|entry| entry.date.starts_with(date_filter))
         .collect();
-
-    records.sort_by(|a, b| a.date.cmp(&b.date));
-
-    if records.is_empty() {
-        return Err(format!("No records for the given filter: '{date_filter}'").into());
+    if entries.is_empty() {
+        return Err(format!("No entries for the given filter: '{date_filter}'").into());
     }
 
+    entries.sort_by(|a, b| a.date.cmp(&b.date));
     Ok(Report {
         filter: Some(String::from(date_filter)),
-        records,
+        entries,
     })
 }
 
 fn generate_report_for_all(file_path: &Path) -> Result<Report, main_error::MainError> {
-    let mut records = records_from_file(file_path)?;
-    records.sort_by(|a, b| a.date.cmp(&b.date));
-
-    if records.is_empty() {
-        return Err(String::from("No records").into());
+    let mut entries = entries_from_file(file_path)?;
+    if entries.is_empty() {
+        return Err(String::from("No entries").into());
     }
 
+    entries.sort_by(|a, b| a.date.cmp(&b.date));
     Ok(Report {
         filter: None,
-        records,
+        entries,
     })
 }
 
 struct Report {
     filter: Option<String>,
-    records: Vec<Record>,
+    entries: Vec<Entry>,
 }
 
 impl Display for Report {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let records: Vec<(String, String)> = self
-            .records
+        let rows: Vec<(String, String)> = self
+            .entries
             .iter()
-            .map(|record| (format!("{}:", record.date), record.amount.human_readable()))
+            .map(|entry| (format!("{}:", entry.date), entry.amount.human_readable()))
             .collect();
 
         let final_line_prefix: String = if let Some(filter) = self.filter.as_ref() {
@@ -210,22 +214,14 @@ impl Display for Report {
         } else {
             "Total amount:".to_string()
         };
-        let total: Decimal = self.records.iter().map(|record| record.amount).sum();
+        let total: Decimal = self.entries.iter().map(|entry| entry.amount).sum();
         let final_line_suffix: String = total.human_readable();
-        let mut max_prefix_len = records
-            .iter()
-            .map(|tuple| tuple.0.chars().count())
-            .max()
-            .unwrap();
-        let mut max_suffix_len = records
-            .iter()
-            .map(|tuple| tuple.1.chars().count())
-            .max()
-            .unwrap();
+        let mut max_prefix_len = rows.iter().map(|row| row.0.chars().count()).max().unwrap();
+        let mut max_suffix_len = rows.iter().map(|row| row.1.chars().count()).max().unwrap();
         max_prefix_len = max_prefix_len.max(final_line_prefix.chars().count());
         max_suffix_len = max_suffix_len.max(final_line_suffix.chars().count()) + 1;
 
-        for (prefix, suffix) in records {
+        for (prefix, suffix) in rows {
             write!(f, "{prefix:>max_prefix_len$}")?;
             writeln!(f, "{suffix:>max_suffix_len$}")?;
         }
