@@ -12,6 +12,6 @@ serde = { version = "1.0.219", features = ["derive"] }
 main_error = "0.1.2"
 
 [dev-dependencies]
-insta = { version = "1.43.0", features = ["filters"] }
+insta = { version = "1.43.1", features = ["filters"] }
 insta-cmd = "0.6.0"
 temp-dir = "0.1.14"
