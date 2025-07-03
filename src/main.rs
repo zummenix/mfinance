@@ -263,111 +263,87 @@ impl HumanReadable for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use rust_decimal::{prelude::FromPrimitive, Decimal};
+    use rust_decimal::{Decimal, prelude::FromPrimitive};
 
     use super::HumanReadable;
 
     #[test]
     fn format_fractions() {
-        assert_eq!(Decimal::from_f32(0.006).unwrap().human_readable(), "0.01");
+        insta::assert_snapshot!(Decimal::from_f32(0.006).unwrap().human_readable(), @r"0.01");
     }
 
     #[test]
     fn format_fractions_negative() {
-        assert_eq!(Decimal::from_f32(-0.006).unwrap().human_readable(), "-0.01");
+        insta::assert_snapshot!(Decimal::from_f32(-0.006).unwrap().human_readable(), @r"-0.01");
     }
 
     #[test]
     fn format_singles() {
-        assert_eq!(Decimal::from_i8(1).unwrap().human_readable(), "1.00");
+        insta::assert_snapshot!(Decimal::from_i8(1).unwrap().human_readable(), @r"1.00");
     }
 
     #[test]
     fn format_singles_negative() {
-        assert_eq!(Decimal::from_i8(-1).unwrap().human_readable(), "-1.00");
+        insta::assert_snapshot!(Decimal::from_i8(-1).unwrap().human_readable(), @r"-1.00");
     }
 
     #[test]
     fn format_tens() {
-        assert_eq!(Decimal::from_i8(10).unwrap().human_readable(), "10.00");
+        insta::assert_snapshot!(Decimal::from_i8(10).unwrap().human_readable(), @r"10.00");
     }
 
     #[test]
     fn format_tens_negative() {
-        assert_eq!(Decimal::from_i8(-10).unwrap().human_readable(), "-10.00");
+        insta::assert_snapshot!(Decimal::from_i8(-10).unwrap().human_readable(), @r"-10.00");
     }
 
     #[test]
     fn format_hundreds() {
-        assert_eq!(Decimal::from_i8(100).unwrap().human_readable(), "100.00");
+        insta::assert_snapshot!(Decimal::from_i8(100).unwrap().human_readable(), @r"100.00");
     }
 
     #[test]
     fn format_hundreds_negative() {
-        assert_eq!(Decimal::from_i8(-100).unwrap().human_readable(), "-100.00");
+        insta::assert_snapshot!(Decimal::from_i8(-100).unwrap().human_readable(), @r"-100.00");
     }
 
     #[test]
     fn format_thousands() {
-        assert_eq!(
-            Decimal::from_f32(1999.99).unwrap().human_readable(),
-            "1\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f32(1999.99).unwrap().human_readable(), @r"1 999.99");
     }
 
     #[test]
     fn format_thousands_negative() {
-        assert_eq!(
-            Decimal::from_f32(-1999.99).unwrap().human_readable(),
-            "-1\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f32(-1999.99).unwrap().human_readable(), @r"-1 999.99");
     }
 
     #[test]
     fn format_ten_thousands() {
-        assert_eq!(
-            Decimal::from_f32(19999.99).unwrap().human_readable(),
-            "19\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f32(19999.99).unwrap().human_readable(), @r"19 999.99");
     }
 
     #[test]
     fn format_ten_thousands_negative() {
-        assert_eq!(
-            Decimal::from_f32(-19999.99).unwrap().human_readable(),
-            "-19\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f32(-19999.99).unwrap().human_readable(), @r"-19 999.99");
     }
 
     #[test]
     fn format_hundred_thousands() {
-        assert_eq!(
-            Decimal::from_f64(199999.99).unwrap().human_readable(),
-            "199\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f64(199999.99).unwrap().human_readable(), @r"199 999.99");
     }
 
     #[test]
     fn format_hundred_thousands_negative() {
-        assert_eq!(
-            Decimal::from_f64(-199999.99).unwrap().human_readable(),
-            "-199\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f64(-199999.99).unwrap().human_readable(), @r"-199 999.99");
     }
 
     #[test]
     fn format_million() {
-        assert_eq!(
-            Decimal::from_f64(1999999.99).unwrap().human_readable(),
-            "1\u{a0}999\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f64(1999999.99).unwrap().human_readable(), @r"1 999 999.99");
     }
 
     #[test]
     fn format_million_negative() {
-        assert_eq!(
-            Decimal::from_f64(-1999999.99).unwrap().human_readable(),
-            "-1\u{a0}999\u{a0}999.99"
-        );
+        insta::assert_snapshot!(Decimal::from_f64(-1999999.99).unwrap().human_readable(), @r"-1 999 999.99");
     }
 }
