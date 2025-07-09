@@ -1,3 +1,10 @@
+use axum::http::StatusCode;
+use axum::{
+    Extension, Router,
+    extract::Path as AxumPath,
+    response::{Html, Json},
+    routing::get,
+};
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use csv::{ReaderBuilder, WriterBuilder};
@@ -48,6 +55,11 @@ enum Commands {
         /// Path to the CSV file
         file: PathBuf,
     },
+    /// Start web server to view CSV files
+    Server {
+        /// Directory containing CSV files
+        dir: PathBuf,
+    },
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -56,7 +68,8 @@ struct Entry {
     amount: Decimal,
 }
 
-fn main() -> Result<(), main_error::MainError> {
+#[tokio::main]
+async fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -90,9 +103,128 @@ fn main() -> Result<(), main_error::MainError> {
             }
             writer.flush()?;
         }
+        Commands::Server { dir } => server_main(dir).await?,
     }
 
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EntryResponse {
+    date: String,
+    amount: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileResponse {
+    years: Vec<YearGroupResponse>,
+    total: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YearGroupResponse {
+    year: String,
+    entries: Vec<EntryResponse>,
+    subtotal: String,
+}
+
+async fn server_main(dir: PathBuf) -> Result<(), main_error::MainError> {
+    use axum::Extension;
+
+    let app = Router::new()
+        .route("/", get(index_handler))
+        .route("/api/files", get(list_files_handler))
+        .route("/api/files/{filename}", get(file_handler))
+        .layer(Extension(dir.clone()));
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    println!("Server running at http://{}", listener.local_addr()?);
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+async fn index_handler() -> Html<&'static str> {
+    Html(include_str!("templates/index.html"))
+}
+
+async fn list_files_handler(Extension(dir): Extension<PathBuf>) -> Json<Vec<String>> {
+    let mut files = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&*dir) {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension() {
+                if ext == "csv" {
+                    if let Some(name) = entry.file_name().to_str() {
+                        files.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Json(files)
+}
+
+async fn file_handler(
+    Extension(dir): Extension<PathBuf>,
+    AxumPath(filename): AxumPath<String>,
+) -> Result<Json<FileResponse>, (StatusCode, String)> {
+    struct YearGroup {
+        entries: Vec<EntryResponse>,
+        subtotal: Decimal,
+    }
+
+    use std::collections::HashMap;
+    let path = dir.join(&filename);
+
+    let entries = entries_from_file(&path)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:?}")))?;
+    let mut year_groups: HashMap<String, YearGroup> = HashMap::new();
+    let mut total = Decimal::default();
+
+    for entry in entries {
+        let date = NaiveDate::parse_from_str(&entry.date, "%Y-%m-%d").map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Invalid date format: {}, {e:?}", entry.date),
+            )
+        })?;
+
+        let year = date.format("%Y").to_string();
+        let amount = entry.amount;
+        total += amount;
+
+        let group = year_groups
+            .entry(year.clone())
+            .or_insert_with(|| YearGroup {
+                entries: Vec::new(),
+                subtotal: Decimal::default(),
+            });
+
+        group.entries.push(EntryResponse {
+            date: date.format("%B %-d").to_string(),
+            amount: amount.human_readable(),
+        });
+        group.subtotal += amount;
+    }
+
+    let mut years: Vec<YearGroupResponse> = year_groups
+        .into_iter()
+        .map(|(year, group)| YearGroupResponse {
+            year,
+            entries: group.entries,
+            subtotal: group.subtotal.human_readable(),
+        })
+        .collect();
+    years.sort_by(|a, b| a.year.cmp(&b.year));
+
+    Ok(Json(FileResponse {
+        years,
+        total: total.human_readable(),
+    }))
 }
 
 fn add_entry(
