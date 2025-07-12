@@ -57,6 +57,12 @@ enum Commands {
     },
     /// Start web server to view CSV files
     Server {
+        /// Host address to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port number to listen on
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
         /// Directory containing CSV files
         dir: PathBuf,
     },
@@ -103,7 +109,7 @@ async fn main() -> Result<(), main_error::MainError> {
             }
             writer.flush()?;
         }
-        Commands::Server { dir } => server_main(dir).await?,
+        Commands::Server { dir, host, port } => server_main(dir, host, port).await?,
     }
 
     Ok(())
@@ -131,7 +137,7 @@ struct YearGroupResponse {
     subtotal: String,
 }
 
-async fn server_main(dir: PathBuf) -> Result<(), main_error::MainError> {
+async fn server_main(dir: PathBuf, host: String, port: u16) -> Result<(), main_error::MainError> {
     use axum::Extension;
 
     let app = Router::new()
@@ -140,7 +146,7 @@ async fn server_main(dir: PathBuf) -> Result<(), main_error::MainError> {
         .route("/api/files/{filename}", get(file_handler))
         .layer(Extension(dir.clone()));
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
     println!("Server running at http://{}", listener.local_addr()?);
     axum::serve(listener, app).await?;
     Ok(())
@@ -164,6 +170,8 @@ async fn list_files_handler(Extension(dir): Extension<PathBuf>) -> Json<Vec<Stri
             }
         }
     }
+
+    files.sort();
 
     Json(files)
 }
