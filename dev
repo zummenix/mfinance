@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+cmd_test-all() {
+    podman build -t mfinance .
+    cargo test --features container-tests
+}
+
+main() {
+    case "${1:-}" in
+        test-all) cmd_test-all ;;
+        *) echo "Usage: $0 test-all"; exit 1 ;;
+    esac
+}
+
+main "$@"
