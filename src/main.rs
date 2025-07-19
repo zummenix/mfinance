@@ -6,6 +6,10 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
+mod number_formatter;
+
+use number_formatter::{FormatOptions, NumberFormatter};
+
 const DELIMITER: u8 = b';';
 
 #[derive(Parser)]
@@ -58,6 +62,7 @@ struct Entry {
 
 fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
+    let format_options = FormatOptions::default();
 
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
@@ -68,7 +73,7 @@ fn main() -> Result<(), main_error::MainError> {
                 chrono::Local::now().date_naive()
             };
             let info = add_entry(&file, date, amount)?;
-            print!("{info}");
+            print!("{}", info.display(format_options));
         }
         Commands::Report { filter, file } => {
             let report = if let Some(filter) = filter {
@@ -76,7 +81,7 @@ fn main() -> Result<(), main_error::MainError> {
             } else {
                 generate_report_for_all(&file)?
             };
-            print!("{report}");
+            print!("{}", report.display(format_options));
         }
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
@@ -136,11 +141,25 @@ struct NewEntryInfo {
     total_after: Decimal,
 }
 
-impl Display for NewEntryInfo {
+impl NewEntryInfo {
+    fn display(&self, options: FormatOptions) -> NewEntryInfoDisplay {
+        NewEntryInfoDisplay {
+            info: self,
+            options,
+        }
+    }
+}
+
+struct NewEntryInfoDisplay<'a> {
+    info: &'a NewEntryInfo,
+    options: FormatOptions,
+}
+
+impl<'a> Display for NewEntryInfoDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let total_before_line = self.total_before.human_readable();
-        let diff_line = (self.total_after - self.total_before).human_readable();
-        let total_after_line = format!("Total: {}", self.total_after.human_readable());
+        let total_before_line = self.info.total_before.format(&self.options);
+        let diff_line = (self.info.total_after - self.info.total_before).format(&self.options);
+        let total_after_line = format!("Total: {}", self.info.total_after.format(&self.options));
 
         let max_len = [&total_before_line, &diff_line, &total_after_line]
             .iter()
@@ -201,21 +220,41 @@ struct Report {
     entries: Vec<Entry>,
 }
 
-impl Display for Report {
+impl Report {
+    fn display(&self, options: FormatOptions) -> ReportDisplay {
+        ReportDisplay {
+            report: self,
+            options,
+        }
+    }
+}
+
+struct ReportDisplay<'a> {
+    report: &'a Report,
+    options: FormatOptions,
+}
+
+impl<'a> Display for ReportDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let rows: Vec<(String, String)> = self
+            .report
             .entries
             .iter()
-            .map(|entry| (format!("{}:", entry.date), entry.amount.human_readable()))
+            .map(|entry| {
+                (
+                    format!("{}:", entry.date),
+                    entry.amount.format(&self.options),
+                )
+            })
             .collect();
 
-        let final_line_prefix: String = if let Some(filter) = self.filter.as_ref() {
+        let final_line_prefix: String = if let Some(filter) = self.report.filter.as_ref() {
             format!("Total amount for filter '{filter}':")
         } else {
             "Total amount:".to_string()
         };
-        let total: Decimal = self.entries.iter().map(|entry| entry.amount).sum();
-        let final_line_suffix: String = total.human_readable();
+        let total: Decimal = self.report.entries.iter().map(|entry| entry.amount).sum();
+        let final_line_suffix: String = total.format(&self.options);
         let mut max_prefix_len = rows.iter().map(|row| row.0.chars().count()).max().unwrap();
         let mut max_suffix_len = rows.iter().map(|row| row.1.chars().count()).max().unwrap();
         max_prefix_len = max_prefix_len.max(final_line_prefix.chars().count());
@@ -230,120 +269,5 @@ impl Display for Report {
         writeln!(f, "{final_line_suffix:>max_suffix_len$}")?;
 
         Ok(())
-    }
-}
-
-trait HumanReadable {
-    fn human_readable(&self) -> String;
-}
-
-impl HumanReadable for Decimal {
-    fn human_readable(&self) -> String {
-        let precision: usize = 2;
-        let decimal = self.round_dp(precision as u32);
-        let decimal_string = format!("{decimal:.precision$}");
-        let sign_offset = usize::from(decimal.is_sign_negative());
-        let len_till_dot = decimal_string.len() - 1 - precision;
-        let mut group_separator_index = (len_till_dot - sign_offset) % 3 + sign_offset;
-        if group_separator_index == sign_offset {
-            group_separator_index = 3 + sign_offset;
-        }
-        let mut result = String::new();
-        for (i, ch) in decimal_string.char_indices() {
-            if group_separator_index == i && group_separator_index < len_till_dot {
-                result.push('\u{a0}');
-                group_separator_index += 3;
-            }
-            result.push(ch);
-        }
-
-        result
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rust_decimal::{Decimal, prelude::FromPrimitive};
-
-    use super::HumanReadable;
-
-    #[test]
-    fn format_fractions() {
-        insta::assert_snapshot!(Decimal::from_f32(0.006).unwrap().human_readable(), @r"0.01");
-    }
-
-    #[test]
-    fn format_fractions_negative() {
-        insta::assert_snapshot!(Decimal::from_f32(-0.006).unwrap().human_readable(), @r"-0.01");
-    }
-
-    #[test]
-    fn format_singles() {
-        insta::assert_snapshot!(Decimal::from_i8(1).unwrap().human_readable(), @r"1.00");
-    }
-
-    #[test]
-    fn format_singles_negative() {
-        insta::assert_snapshot!(Decimal::from_i8(-1).unwrap().human_readable(), @r"-1.00");
-    }
-
-    #[test]
-    fn format_tens() {
-        insta::assert_snapshot!(Decimal::from_i8(10).unwrap().human_readable(), @r"10.00");
-    }
-
-    #[test]
-    fn format_tens_negative() {
-        insta::assert_snapshot!(Decimal::from_i8(-10).unwrap().human_readable(), @r"-10.00");
-    }
-
-    #[test]
-    fn format_hundreds() {
-        insta::assert_snapshot!(Decimal::from_i8(100).unwrap().human_readable(), @r"100.00");
-    }
-
-    #[test]
-    fn format_hundreds_negative() {
-        insta::assert_snapshot!(Decimal::from_i8(-100).unwrap().human_readable(), @r"-100.00");
-    }
-
-    #[test]
-    fn format_thousands() {
-        insta::assert_snapshot!(Decimal::from_f32(1999.99).unwrap().human_readable(), @r"1 999.99");
-    }
-
-    #[test]
-    fn format_thousands_negative() {
-        insta::assert_snapshot!(Decimal::from_f32(-1999.99).unwrap().human_readable(), @r"-1 999.99");
-    }
-
-    #[test]
-    fn format_ten_thousands() {
-        insta::assert_snapshot!(Decimal::from_f32(19999.99).unwrap().human_readable(), @r"19 999.99");
-    }
-
-    #[test]
-    fn format_ten_thousands_negative() {
-        insta::assert_snapshot!(Decimal::from_f32(-19999.99).unwrap().human_readable(), @r"-19 999.99");
-    }
-
-    #[test]
-    fn format_hundred_thousands() {
-        insta::assert_snapshot!(Decimal::from_f64(199999.99).unwrap().human_readable(), @r"199 999.99");
-    }
-
-    #[test]
-    fn format_hundred_thousands_negative() {
-        insta::assert_snapshot!(Decimal::from_f64(-199999.99).unwrap().human_readable(), @r"-199 999.99");
-    }
-
-    #[test]
-    fn format_million() {
-        insta::assert_snapshot!(Decimal::from_f64(1999999.99).unwrap().human_readable(), @r"1 999 999.99");
-    }
-
-    #[test]
-    fn format_million_negative() {
-        insta::assert_snapshot!(Decimal::from_f64(-1999999.99).unwrap().human_readable(), @r"-1 999 999.99");
     }
 }
