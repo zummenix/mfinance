@@ -5,6 +5,7 @@ use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 mod number_formatter;
 
@@ -67,8 +68,10 @@ fn main() -> Result<(), main_error::MainError> {
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
             let date: NaiveDate = if let Some(date) = date {
-                date.parse()
-                    .map_err(|err| format!("failed to parse date, {err}"))?
+                date.parse().map_err(|source| AppError::DateParse {
+                    source,
+                    input: date.clone(),
+                })?
             } else {
                 chrono::Local::now().date_naive()
             };
@@ -86,25 +89,59 @@ fn main() -> Result<(), main_error::MainError> {
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
             entries.sort_by(|a, b| a.date.cmp(&b.date));
-            let mut writer = WriterBuilder::new()
-                .delimiter(DELIMITER)
-                .from_writer(OpenOptions::new().write(true).truncate(true).open(&file)?);
+            let mut writer = WriterBuilder::new().delimiter(DELIMITER).from_writer(
+                OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&file)
+                    .map_err(|source| AppError::Io {
+                        source,
+                        context: String::from("Failed to open file when saving sorted csv"),
+                    })?,
+            );
 
             for entry in entries {
                 writer.serialize(entry)?;
             }
-            writer.flush()?;
+            writer.flush().map_err(|source| AppError::Io {
+                source,
+                context: String::from("Failed to flush the sorted csv writer buffer"),
+            })?;
         }
     }
 
     Ok(())
 }
 
-fn add_entry(
-    file_path: &Path,
-    date: NaiveDate,
-    amount: Decimal,
-) -> Result<NewEntryInfo, main_error::MainError> {
+#[derive(Debug, Error)]
+enum AppError {
+    #[error("I/O error: {context}")]
+    Io {
+        #[source]
+        source: std::io::Error,
+        context: String,
+    },
+
+    #[error("CSV error: {source}")]
+    Csv {
+        #[from]
+        source: csv::Error,
+    },
+
+    #[error("Invalid date format: {input} ({source})")]
+    DateParse {
+        source: chrono::format::ParseError,
+        input: String,
+    },
+
+    #[error("No entries found")]
+    NoEntries,
+
+    #[error("No entries matching filter: {0}")]
+    FilteredNoEntries(String),
+}
+
+fn add_entry(file_path: &Path, date: NaiveDate, amount: Decimal) -> Result<NewEntryInfo, AppError> {
     let entries = entries_from_file(file_path).unwrap_or_default();
     let total_before: Decimal = entries.iter().map(|entry| entry.amount).sum();
 
@@ -121,11 +158,18 @@ fn add_entry(
             OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(file_path)?,
+                .open(file_path)
+                .map_err(|source| AppError::Io {
+                    source,
+                    context: String::from("Failed to open file to add a new entry"),
+                })?,
         );
 
     writer.serialize(new_entry)?;
-    writer.flush()?;
+    writer.flush().map_err(|source| AppError::Io {
+        source,
+        context: String::from("Failed to flush the writer buffer when saving new entry"),
+    })?;
 
     Ok(NewEntryInfo {
         total_before,
@@ -174,25 +218,30 @@ impl<'a> Display for NewEntryInfoDisplay<'a> {
     }
 }
 
-fn entries_from_file(path: &Path) -> Result<Vec<Entry>, main_error::MainError> {
-    if !path.exists() {
-        return Err(format!("File '{}' does not exist", path.to_string_lossy()).into());
-    }
+fn entries_from_file(path: &Path) -> Result<Vec<Entry>, AppError> {
+    std::fs::metadata(path).map_err(|e| AppError::Io {
+        source: e,
+        context: format!("Failed to access file: {}", path.display()),
+    })?;
 
-    let mut reader = ReaderBuilder::new().delimiter(DELIMITER).from_path(path)?;
+    let mut reader = ReaderBuilder::new()
+        .delimiter(DELIMITER)
+        .from_path(path)
+        .map_err(|source| AppError::Csv { source })?;
     let entries = reader
         .deserialize::<Entry>()
         .collect::<Result<Vec<_>, _>>()?;
     Ok(entries)
 }
 
-fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_error::MainError> {
+fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, AppError> {
     let mut entries: Vec<Entry> = entries_from_file(file_path)?
         .into_iter()
         .filter(|entry| entry.date.starts_with(date_filter))
         .collect();
+
     if entries.is_empty() {
-        return Err(format!("No entries for the given filter: '{date_filter}'").into());
+        return Err(AppError::FilteredNoEntries(date_filter.to_string()));
     }
 
     entries.sort_by(|a, b| a.date.cmp(&b.date));
@@ -202,10 +251,10 @@ fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, main_e
     })
 }
 
-fn generate_report_for_all(file_path: &Path) -> Result<Report, main_error::MainError> {
+fn generate_report_for_all(file_path: &Path) -> Result<Report, AppError> {
     let mut entries = entries_from_file(file_path)?;
     if entries.is_empty() {
-        return Err(String::from("No entries").into());
+        return Err(AppError::NoEntries);
     }
 
     entries.sort_by(|a, b| a.date.cmp(&b.date));
