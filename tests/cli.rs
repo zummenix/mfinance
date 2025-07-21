@@ -80,7 +80,8 @@ fn new_entry_with_invalid_date_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: failed to parse date, premature end of input
+    Error: Invalid date format: 2024-12 (premature end of input)
+    caused by: premature end of input
     ");
 }
 
@@ -135,7 +136,7 @@ fn report_filter_year_no_entries_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No entries for the given filter: '2020'
+    Error: No entries matching filter: 2020
     ");
 }
 
@@ -169,7 +170,7 @@ fn report_filter_year_month_no_entries_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No entries for the given filter: '2020-01'
+    Error: No entries matching filter: 2020-01
     ");
 }
 
@@ -185,7 +186,8 @@ fn report_no_file_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: File '[TEMP_DIR]/test.csv' does not exist
+    Error: I/O error: Failed to access file: [TEMP_DIR]/test.csv
+    caused by: No such file or directory (os error 2)
     ");
 }
 
@@ -201,7 +203,7 @@ fn report_no_entries_error() {
     ----- stdout -----
 
     ----- stderr -----
-    Error: No entries
+    Error: No entries found
     ");
 }
 
