@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 mod number_formatter;
+mod tui;
 
 use number_formatter::{FormatOptions, NumberFormatter};
 
@@ -23,6 +24,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Interactive terminal UI
+    Tui {
+        /// Directory containing CSV files
+        path: PathBuf,
+    },
     /// Add a new entry with amount to the CSV file
     NewEntry {
         /// Amount to add (e.g. -999.99)
@@ -85,6 +91,9 @@ fn main() -> Result<(), main_error::MainError> {
                 generate_report_for_all(&file)?
             };
             print!("{}", report.display(format_options));
+        }
+        Commands::Tui { path } => {
+            tui::run_tui(&path, format_options)?;
         }
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
