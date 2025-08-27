@@ -102,18 +102,18 @@ impl ReportViewModel {
             title: file
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
-                .ok_or(format!("Failed to get file name"))?,
-            total: total.format(&format_options),
+                .ok_or("Failed to get file name".to_string())?,
+            total: total.format(format_options),
             year_reports: years_map
                 .into_iter()
                 .map(|(year, entries)| {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
                     YearReportViewModel {
                         title: year,
-                        subtotal_amount: subtotal_amount.format(&format_options),
+                        subtotal_amount: subtotal_amount.format(format_options),
                         lines: entries
                             .into_iter()
-                            .map(|entry| (entry.date, entry.amount.format(&format_options)))
+                            .map(|entry| (entry.date, entry.amount.format(format_options)))
                             .collect(),
                     }
                 })
@@ -217,12 +217,12 @@ impl App {
 
     fn select_file(&mut self) {
         if let Some(path) = self.files.get(self.selected_file) {
-            match ReportViewModel::new(&path, &self.format_options) {
+            match ReportViewModel::new(path, &self.format_options) {
                 Ok(report) => {
                     self.selected_year = (report.year_reports.len() - 1).max(0);
                     self.report = report;
                 }
-                Err(e) => eprintln!("Error loading file: {}", e),
+                Err(e) => eprintln!("Error loading file: {e}"),
             }
         }
     }
