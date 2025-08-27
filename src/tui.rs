@@ -1,0 +1,356 @@
+use crate::{
+    Entry, entries_from_file,
+    number_formatter::{FormatOptions, NumberFormatter},
+};
+use chrono::Datelike;
+use chrono::NaiveDate;
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::{
+    Terminal,
+    prelude::*,
+    widgets::{block::*, *},
+};
+use rust_decimal::Decimal;
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
+
+pub fn run_tui(
+    dir_path: &Path,
+    format_options: FormatOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    enable_raw_mode()?;
+    let mut stdout = std::io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut app = App::new(dir_path, format_options)?;
+
+    let res = loop {
+        terminal.draw(|f| ui(f, &mut app))?;
+
+        if let Event::Key(key) = event::read()? {
+            if key.kind == KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Char('q') => break Ok(()),
+                    KeyCode::Down => app.next(),
+                    KeyCode::Char('j') => app.next(),
+                    KeyCode::Up => app.previous(),
+                    KeyCode::Char('k') => app.previous(),
+                    KeyCode::Tab => app.cycle_focus(),
+                    _ => {}
+                }
+            }
+        }
+    };
+
+    disable_raw_mode()?;
+    execute!(std::io::stdout(), LeaveAlternateScreen)?;
+    res
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum Focus {
+    FileSelection,
+    Years,
+    YearDetails,
+}
+
+struct App {
+    files: Vec<PathBuf>,
+    format_options: FormatOptions,
+    selected_file: usize,
+    report: ReportViewModel,
+    focus: Focus,
+    selected_year: usize,
+    selected_entry: usize,
+}
+
+#[derive(Default)]
+struct ReportViewModel {
+    title: String,
+    total: String,
+    year_reports: Vec<YearReportViewModel>,
+}
+
+struct YearReportViewModel {
+    title: String,
+    subtotal_amount: String,
+    lines: Vec<(String, String)>,
+}
+
+impl ReportViewModel {
+    fn new(
+        file: &Path,
+        format_options: &FormatOptions,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let entries = entries_from_file(file)?;
+        let total: Decimal = entries.iter().map(|entry| entry.amount).sum();
+        let mut years_map: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
+        for entry in entries {
+            let date: NaiveDate = entry.date.parse()?;
+            let year = date.year().to_string();
+            years_map.entry(year).or_default().push(entry);
+        }
+        Ok(ReportViewModel {
+            title: file
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .ok_or(format!("Failed to get file name"))?,
+            total: total.format(&format_options),
+            year_reports: years_map
+                .into_iter()
+                .map(|(year, entries)| {
+                    let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
+                    YearReportViewModel {
+                        title: year,
+                        subtotal_amount: subtotal_amount.format(&format_options),
+                        lines: entries
+                            .into_iter()
+                            .map(|entry| (entry.date, entry.amount.format(&format_options)))
+                            .collect(),
+                    }
+                })
+                .collect(),
+        })
+    }
+}
+
+impl App {
+    fn new(
+        dir_path: &Path,
+        format_options: FormatOptions,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let files = get_csv_files(dir_path)?;
+        let mut app = Self {
+            files,
+            format_options,
+            selected_file: 0,
+            focus: Focus::FileSelection,
+            report: ReportViewModel::default(),
+            selected_year: 0,
+            selected_entry: 0,
+        };
+        app.select_file();
+        Ok(app)
+    }
+
+    fn cycle_focus(&mut self) {
+        self.focus = match self.focus {
+            Focus::FileSelection => Focus::Years,
+            Focus::Years => Focus::YearDetails,
+            Focus::YearDetails => Focus::FileSelection,
+        };
+        // Reset selection when changing focus areas
+        self.selected_entry = 0;
+    }
+
+    fn next(&mut self) {
+        match self.focus {
+            Focus::FileSelection => {
+                if self.selected_file + 1 >= self.files.len() {
+                    self.selected_file = 0;
+                } else {
+                    self.selected_file += 1;
+                }
+                self.select_file();
+            }
+            Focus::Years => {
+                if self.selected_year + 1 >= self.report.year_reports.len() {
+                    self.selected_year = 0;
+                } else {
+                    self.selected_year += 1;
+                }
+                self.selected_entry = 0;
+            }
+            Focus::YearDetails => {
+                let entry_count = self
+                    .report
+                    .year_reports
+                    .get(self.selected_year)
+                    .map(|yr| yr.lines.len())
+                    .unwrap_or(0);
+                if self.selected_entry + 1 >= entry_count {
+                    self.selected_entry = 0;
+                } else {
+                    self.selected_entry += 1;
+                }
+            }
+        }
+    }
+
+    fn previous(&mut self) {
+        match self.focus {
+            Focus::FileSelection => {
+                if self.selected_file == 0 {
+                    self.selected_file = self.files.len() - 1;
+                } else {
+                    self.selected_file -= 1;
+                }
+                self.select_file();
+            }
+            Focus::Years => {
+                if self.selected_year == 0 {
+                    self.selected_year = self.report.year_reports.len().saturating_sub(1);
+                } else {
+                    self.selected_year -= 1;
+                }
+                self.selected_entry = 0;
+            }
+            Focus::YearDetails => {
+                let entry_count = self
+                    .report
+                    .year_reports
+                    .get(self.selected_year)
+                    .map(|yr| yr.lines.len())
+                    .unwrap_or(0);
+                if self.selected_entry == 0 {
+                    self.selected_entry = entry_count.saturating_sub(1);
+                } else {
+                    self.selected_entry -= 1;
+                }
+            }
+        }
+    }
+
+    fn select_file(&mut self) {
+        if let Some(path) = self.files.get(self.selected_file) {
+            match ReportViewModel::new(&path, &self.format_options) {
+                Ok(report) => {
+                    self.selected_year = (report.year_reports.len() - 1).max(0);
+                    self.report = report;
+                }
+                Err(e) => eprintln!("Error loading file: {}", e),
+            }
+        }
+    }
+
+    fn create_block<'a>(&self, title: Line<'a>, focus_area: Focus) -> Block<'a> {
+        Block::default()
+            .title(title.add_modifier(if self.focus == focus_area {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            }))
+            .borders(Borders::ALL)
+            .border_type(if self.focus == focus_area {
+                BorderType::Double
+            } else {
+                BorderType::Plain
+            })
+    }
+}
+
+fn ui(frame: &mut Frame, app: &mut App) {
+    let main_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(3), Constraint::Length(3)])
+        .split(frame.area());
+
+    let content_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
+            Constraint::Percentage(40),
+        ])
+        .split(main_layout[0]);
+
+    let files: Vec<ListItem> = app
+        .files
+        .iter()
+        .map(|path| ListItem::new(path.file_name().unwrap().to_string_lossy()))
+        .collect();
+
+    let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
+    let files_list = List::new(files)
+        .block(app.create_block(Line::from(" Files "), Focus::FileSelection))
+        .highlight_style(highlight_style);
+    frame.render_stateful_widget(
+        files_list,
+        content_layout[0],
+        &mut ListState::default().with_selected(match app.focus {
+            Focus::FileSelection => Some(app.selected_file),
+            _ => None,
+        }),
+    );
+
+    // Years list (middle column)
+    let years_width = content_layout[1].width.saturating_sub(2) as usize; // Account for block borders
+    let years_list = List::new(app.report.year_reports.iter().map(move |year| {
+        let year_span = Span::raw(&year.title);
+        let amount_span = Span::raw(&year.subtotal_amount);
+        let year_width = year_span.width();
+        let amount_width = amount_span.width();
+        let padding = " ".repeat(years_width.saturating_sub(year_width + amount_width));
+        ListItem::new(Line::from(vec![year_span, Span::raw(padding), amount_span]))
+    }))
+    .block(app.create_block(
+        Line::from(format!(" {} | {} ", app.report.title, app.report.total)),
+        Focus::Years,
+    ))
+    .highlight_style(highlight_style);
+
+    frame.render_stateful_widget(
+        years_list,
+        content_layout[1],
+        &mut ListState::default().with_selected(match app.focus {
+            Focus::Years => Some(app.selected_year),
+            _ => None,
+        }),
+    );
+
+    // Entries list (right column)
+    let entries_width = content_layout[2].width.saturating_sub(2) as usize; // Account for block borders
+    let selected_year = &app.report.year_reports[app.selected_year];
+    let entries_list = List::new(selected_year.lines.iter().map(|(date, amount)| {
+        let date_span = Span::raw(date);
+        let amount_span = Span::raw(amount);
+        let date_width = date_span.width();
+        let amount_width = amount_span.width();
+        let padding = " ".repeat(entries_width.saturating_sub(date_width + amount_width));
+        ListItem::new(Line::from(vec![date_span, Span::raw(padding), amount_span]))
+    }))
+    .block(app.create_block(
+        Line::from(format!(
+            " {} | {} ",
+            selected_year.title, selected_year.subtotal_amount
+        )),
+        Focus::YearDetails,
+    ))
+    .highlight_style(highlight_style);
+
+    frame.render_stateful_widget(
+        entries_list,
+        content_layout[2],
+        &mut ListState::default().with_selected(match app.focus {
+            Focus::YearDetails => Some(app.selected_entry),
+            _ => None,
+        }),
+    );
+
+    let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
+        .block(Block::default().borders(Borders::ALL));
+    frame.render_widget(footer, main_layout[1]);
+}
+
+fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut files = std::fs::read_dir(dir)?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension()?.to_str()? == "csv" {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    Ok(files)
+}
