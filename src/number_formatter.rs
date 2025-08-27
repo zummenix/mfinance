@@ -52,8 +52,8 @@ impl NumberFormatter for Decimal {
         }
 
         match &options.currency {
-            CurrencyPosition::Prefix(symbol) => format!("{}{}", symbol, formatted),
-            CurrencyPosition::Suffix(symbol) => format!("{}{}", formatted, symbol),
+            CurrencyPosition::Prefix(symbol) => format!("{symbol}{formatted}"),
+            CurrencyPosition::Suffix(symbol) => format!("{formatted}{symbol}"),
             CurrencyPosition::None => formatted,
         }
     }

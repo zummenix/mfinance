@@ -21,7 +21,7 @@ use std::{
 };
 
 pub fn run_tui(
-    dir_path: &Path,
+    files: Vec<PathBuf>,
     format_options: FormatOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
@@ -30,7 +30,7 @@ pub fn run_tui(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(dir_path, format_options)?;
+    let mut app = App::new(files, format_options);
 
     let res = loop {
         terminal.draw(|f| ui(f, &mut app))?;
@@ -102,18 +102,18 @@ impl ReportViewModel {
             title: file
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
-                .ok_or(format!("Failed to get file name"))?,
-            total: total.format(&format_options),
+                .ok_or("Failed to get file name".to_string())?,
+            total: total.format(format_options),
             year_reports: years_map
                 .into_iter()
                 .map(|(year, entries)| {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
                     YearReportViewModel {
                         title: year,
-                        subtotal_amount: subtotal_amount.format(&format_options),
+                        subtotal_amount: subtotal_amount.format(format_options),
                         lines: entries
                             .into_iter()
-                            .map(|entry| (entry.date, entry.amount.format(&format_options)))
+                            .map(|entry| (entry.date, entry.amount.format(format_options)))
                             .collect(),
                     }
                 })
@@ -123,11 +123,7 @@ impl ReportViewModel {
 }
 
 impl App {
-    fn new(
-        dir_path: &Path,
-        format_options: FormatOptions,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let files = get_csv_files(dir_path)?;
+    fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
         let mut app = Self {
             files,
             format_options,
@@ -138,7 +134,7 @@ impl App {
             selected_entry: 0,
         };
         app.select_file();
-        Ok(app)
+        app
     }
 
     fn cycle_focus(&mut self) {
@@ -221,12 +217,12 @@ impl App {
 
     fn select_file(&mut self) {
         if let Some(path) = self.files.get(self.selected_file) {
-            match ReportViewModel::new(&path, &self.format_options) {
+            match ReportViewModel::new(path, &self.format_options) {
                 Ok(report) => {
                     self.selected_year = (report.year_reports.len() - 1).max(0);
                     self.report = report;
                 }
-                Err(e) => eprintln!("Error loading file: {}", e),
+                Err(e) => eprintln!("Error loading file: {e}"),
             }
         }
     }
@@ -338,19 +334,4 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(footer, main_layout[1]);
-}
-
-fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-    let mut files = std::fs::read_dir(dir)?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.extension()?.to_str()? == "csv" {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
 }
