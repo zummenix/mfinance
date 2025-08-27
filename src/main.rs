@@ -93,7 +93,14 @@ fn main() -> Result<(), main_error::MainError> {
             print!("{}", report.display(format_options));
         }
         Commands::Tui { path } => {
-            tui::run_tui(&path, format_options)?;
+            let files = get_csv_files(&path)?;
+            if files.is_empty() {
+                return Err(main_error::MainError::from(AppError::Io {
+                    source: std::io::Error::new(std::io::ErrorKind::NotFound, "No CSV files found"),
+                    context: format!("No CSV files found in directory: {}", path.display()),
+                }));
+            }
+            tui::run_tui(files, format_options)?;
         }
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
@@ -328,4 +335,19 @@ impl<'a> Display for ReportDisplay<'a> {
 
         Ok(())
     }
+}
+
+fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut files = std::fs::read_dir(dir)?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension()?.to_str()? == "csv" {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    Ok(files)
 }

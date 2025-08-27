@@ -21,7 +21,7 @@ use std::{
 };
 
 pub fn run_tui(
-    dir_path: &Path,
+    files: Vec<PathBuf>,
     format_options: FormatOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
@@ -30,7 +30,7 @@ pub fn run_tui(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(dir_path, format_options)?;
+    let mut app = App::new(files, format_options);
 
     let res = loop {
         terminal.draw(|f| ui(f, &mut app))?;
@@ -123,11 +123,7 @@ impl ReportViewModel {
 }
 
 impl App {
-    fn new(
-        dir_path: &Path,
-        format_options: FormatOptions,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let files = get_csv_files(dir_path)?;
+    fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
         let mut app = Self {
             files,
             format_options,
@@ -138,7 +134,7 @@ impl App {
             selected_entry: 0,
         };
         app.select_file();
-        Ok(app)
+        app
     }
 
     fn cycle_focus(&mut self) {
@@ -338,19 +334,4 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(footer, main_layout[1]);
-}
-
-fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-    let mut files = std::fs::read_dir(dir)?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.extension()?.to_str()? == "csv" {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
 }
