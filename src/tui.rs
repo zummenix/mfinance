@@ -252,17 +252,25 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let content_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
-            Constraint::Percentage(40),
+            Constraint::Percentage(34),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
         ])
         .split(main_layout[0]);
 
-    let files: Vec<ListItem> = app
-        .files
-        .iter()
-        .map(|path| ListItem::new(path.file_name().unwrap().to_string_lossy()))
-        .collect();
+    let files_width = content_layout[0].width.saturating_sub(2) as usize; // Account for block borders
+    let files = app.files.iter().enumerate().map(|(i, path)| {
+        ListItem::new(make_line(
+            path.file_name().unwrap().to_string_lossy(),
+            if i == app.selected_file {
+                &app.report.total
+            } else {
+                ""
+            },
+            i == app.selected_file,
+            files_width,
+        ))
+    });
 
     let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
     let files_list = List::new(files)
@@ -279,18 +287,15 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     // Years list (middle column)
     let years_width = content_layout[1].width.saturating_sub(2) as usize; // Account for block borders
-    let years_list = List::new(app.report.year_reports.iter().map(move |year| {
-        let year_span = Span::raw(&year.title);
-        let amount_span = Span::raw(&year.subtotal_amount);
-        let year_width = year_span.width();
-        let amount_width = amount_span.width();
-        let padding = " ".repeat(years_width.saturating_sub(year_width + amount_width));
-        ListItem::new(Line::from(vec![year_span, Span::raw(padding), amount_span]))
+    let years_list = List::new(app.report.year_reports.iter().enumerate().map(|(i, year)| {
+        ListItem::new(make_line(
+            &year.title,
+            &year.subtotal_amount,
+            i == app.selected_year,
+            years_width,
+        ))
     }))
-    .block(app.create_block(
-        Line::from(format!(" {} | {} ", app.report.title, app.report.total)),
-        Focus::Years,
-    ))
+    .block(app.create_block(Line::from(format!(" {} ", app.report.title)), Focus::Years))
     .highlight_style(highlight_style);
 
     frame.render_stateful_widget(
@@ -305,19 +310,18 @@ fn ui(frame: &mut Frame, app: &mut App) {
     // Entries list (right column)
     let entries_width = content_layout[2].width.saturating_sub(2) as usize; // Account for block borders
     let selected_year = &app.report.year_reports[app.selected_year];
-    let entries_list = List::new(selected_year.lines.iter().map(|(date, amount)| {
-        let date_span = Span::raw(date);
-        let amount_span = Span::raw(amount);
-        let date_width = date_span.width();
-        let amount_width = amount_span.width();
-        let padding = " ".repeat(entries_width.saturating_sub(date_width + amount_width));
-        ListItem::new(Line::from(vec![date_span, Span::raw(padding), amount_span]))
-    }))
+    let entries_list = List::new(selected_year.lines.iter().enumerate().map(
+        |(i, (date, amount))| {
+            ListItem::new(make_line(
+                date,
+                &amount,
+                i == app.selected_entry,
+                entries_width,
+            ))
+        },
+    ))
     .block(app.create_block(
-        Line::from(format!(
-            " {} | {} ",
-            selected_year.title, selected_year.subtotal_amount
-        )),
+        Line::from(format!(" {} ", selected_year.title)),
         Focus::YearDetails,
     ))
     .highlight_style(highlight_style);
@@ -334,4 +338,30 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(footer, main_layout[1]);
+}
+
+fn make_line<'a>(
+    left: impl Into<std::borrow::Cow<'a, str>>,
+    right: &'a str,
+    is_selected: bool,
+    width: usize,
+) -> Line<'a> {
+    let padding_span = Span::raw(" ");
+    let left_span = Span::raw(left);
+    let right_span = Span::raw(right);
+    let spacer = " ".repeat(
+        width.saturating_sub(left_span.width() + right_span.width() + padding_span.width() * 2),
+    );
+    let line = Line::from(vec![
+        padding_span.clone(),
+        left_span,
+        Span::raw(spacer),
+        right_span,
+        padding_span,
+    ]);
+    if is_selected {
+        line.style(Style::default().bg(Color::DarkGray))
+    } else {
+        line
+    }
 }
