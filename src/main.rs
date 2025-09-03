@@ -202,7 +202,7 @@ struct NewEntryInfo {
 }
 
 impl NewEntryInfo {
-    fn display(&self, options: FormatOptions) -> NewEntryInfoDisplay {
+    fn display(&self, options: FormatOptions) -> NewEntryInfoDisplay<'_> {
         NewEntryInfoDisplay {
             info: self,
             options,
@@ -286,7 +286,7 @@ struct Report {
 }
 
 impl Report {
-    fn display(&self, options: FormatOptions) -> ReportDisplay {
+    fn display(&self, options: FormatOptions) -> ReportDisplay<'_> {
         ReportDisplay {
             report: self,
             options,

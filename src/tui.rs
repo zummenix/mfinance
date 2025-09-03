@@ -35,17 +35,17 @@ pub fn run_tui(
     let res = loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') => break Ok(()),
-                    KeyCode::Down => app.next(),
-                    KeyCode::Char('j') => app.next(),
-                    KeyCode::Up => app.previous(),
-                    KeyCode::Char('k') => app.previous(),
-                    KeyCode::Tab => app.cycle_focus(),
-                    _ => {}
-                }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') => break Ok(()),
+                KeyCode::Down => app.next(),
+                KeyCode::Char('j') => app.next(),
+                KeyCode::Up => app.previous(),
+                KeyCode::Char('k') => app.previous(),
+                KeyCode::Tab => app.cycle_focus(),
+                _ => {}
             }
         }
     };
@@ -314,7 +314,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
         |(i, (date, amount))| {
             ListItem::new(make_line(
                 date,
-                &amount,
+                amount,
                 i == app.selected_entry,
                 entries_width,
             ))
