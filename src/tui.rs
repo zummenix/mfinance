@@ -55,6 +55,49 @@ pub fn run_tui(
     res
 }
 
+/// Testable version that accepts a backend and event iterator  
+/// For testing with TestBackend - returns rendered buffer as string
+pub fn run_tui_with_events_test(
+    files: Vec<PathBuf>,
+    format_options: FormatOptions,
+    events: impl IntoIterator<Item = Event>,
+    width: u16,
+    height: u16,
+) -> Result<String, Box<dyn std::error::Error>>
+{
+    use ratatui::backend::TestBackend;
+    
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend)?;
+    let mut app = App::new(files, format_options);
+    
+    // Draw initial state
+    terminal.draw(|f| ui(f, &mut app))?;
+    
+    // Process events
+    for event in events {
+        if let Event::Key(key) = event
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Down => app.next(),
+                KeyCode::Char('j') => app.next(),
+                KeyCode::Up => app.previous(),
+                KeyCode::Char('k') => app.previous(),
+                KeyCode::Tab => app.cycle_focus(),
+                _ => {}
+            }
+        }
+        
+        // Redraw after each event
+        terminal.draw(|f| ui(f, &mut app))?;
+    }
+    
+    // Return buffer content
+    Ok(format!("{:?}", terminal.backend().buffer()))
+}
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Focus {
     FileSelection,
@@ -62,7 +105,7 @@ enum Focus {
     YearDetails,
 }
 
-pub struct App {
+struct App {
     files: Vec<PathBuf>,
     format_options: FormatOptions,
     selected_file: usize,
@@ -123,7 +166,7 @@ impl ReportViewModel {
 }
 
 impl App {
-    pub fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
+    fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
         let mut app = Self {
             files,
             format_options,
@@ -137,7 +180,7 @@ impl App {
         app
     }
 
-    pub fn cycle_focus(&mut self) {
+    fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             Focus::FileSelection => Focus::Years,
             Focus::Years => Focus::YearDetails,
@@ -147,7 +190,7 @@ impl App {
         self.selected_entry = 0;
     }
 
-    pub fn next(&mut self) {
+    fn next(&mut self) {
         match self.focus {
             Focus::FileSelection => {
                 if self.selected_file + 1 >= self.files.len() {
@@ -181,7 +224,7 @@ impl App {
         }
     }
 
-    pub fn previous(&mut self) {
+    fn previous(&mut self) {
         match self.focus {
             Focus::FileSelection => {
                 if self.selected_file == 0 {
@@ -243,7 +286,7 @@ impl App {
     }
 }
 
-pub fn ui(frame: &mut Frame, app: &mut App) {
+fn ui(frame: &mut Frame, app: &mut App) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(3), Constraint::Length(3)])

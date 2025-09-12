@@ -1,12 +1,9 @@
 use insta::assert_snapshot;
 use mfinance::{
-    tui::{App, ui},
+    tui::run_tui_with_events_test,
     number_formatter::FormatOptions,
 };
-use ratatui::{
-    backend::TestBackend,
-    Terminal,
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use std::{
     fs,
     path::PathBuf,
@@ -48,109 +45,132 @@ impl TuiTestFixture {
 
         TuiTestFixture { tempdir, files }
     }
-
-    fn create_app(&self) -> App {
-        App::new(self.files.clone(), FormatOptions::default())
+    
+    fn format_options() -> FormatOptions {
+        FormatOptions::default()
     }
-}
-
-fn render_app_to_string(app: &mut App, width: u16, height: u16) -> String {
-    let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend).unwrap();
     
-    // Render the app to the terminal
-    terminal.draw(|f| ui(f, app)).unwrap();
+    /// Helper to create key event
+    fn key_event(code: KeyCode) -> Event {
+        Event::Key(KeyEvent {
+            code,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        })
+    }
     
-    // Return debug representation of the buffer for now
-    format!("{:?}", terminal.backend().buffer())
+    /// Run TUI with events and return final buffer content
+    fn run_with_events(&self, events: Vec<Event>) -> String {
+        run_tui_with_events_test(
+            self.files.clone(),
+            Self::format_options(),
+            events,
+            120, // width
+            30,  // height
+        ).expect("TUI should run without error")
+    }
 }
 
 #[test]
 fn test_initial_display() {
     let fixture = TuiTestFixture::new();
-    let mut app = fixture.create_app();
     
-    let output = render_app_to_string(&mut app, 120, 30);
+    // Test initial state with no events
+    let output = fixture.run_with_events(vec![]);
     assert_snapshot!("initial_display", output);
 }
 
 #[test] 
-fn test_file_navigation() {
+fn test_file_navigation_with_keys() {
     let fixture = TuiTestFixture::new();
-    let mut app = fixture.create_app();
     
-    // Test navigation through files
-    app.next(); // Move to second file
-    let output_file2 = render_app_to_string(&mut app, 120, 30);
+    // Test navigation through files with j/k keys
+    let output_file2 = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
+    ]);
     assert_snapshot!("file_navigation_second", output_file2);
     
-    app.next(); // Move to third file  
-    let output_file3 = render_app_to_string(&mut app, 120, 30);
+    let output_file3 = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
+        TuiTestFixture::key_event(KeyCode::Down),      // Move to third file  
+    ]);
     assert_snapshot!("file_navigation_third", output_file3);
     
-    app.next(); // Should wrap to first file
-    let output_wrapped = render_app_to_string(&mut app, 120, 30);
+    let output_wrapped = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
+        TuiTestFixture::key_event(KeyCode::Down),      // Move to third file
+        TuiTestFixture::key_event(KeyCode::Char('j')), // Should wrap to first file
+    ]);
     assert_snapshot!("file_navigation_wrapped", output_wrapped);
 }
 
 #[test]
-fn test_focus_cycling() {
+fn test_focus_cycling_with_tab() {
     let fixture = TuiTestFixture::new();
-    let mut app = fixture.create_app();
     
     // Initial focus should be on file selection
-    let initial_output = render_app_to_string(&mut app, 120, 30);
+    let initial_output = fixture.run_with_events(vec![]);
     assert_snapshot!("focus_files", initial_output);
     
-    // Cycle to years focus
-    app.cycle_focus();
-    let years_output = render_app_to_string(&mut app, 120, 30);
+    // Cycle to years focus with Tab
+    let years_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),
+    ]);
     assert_snapshot!("focus_years", years_output);
     
-    // Cycle to year details focus
-    app.cycle_focus(); 
-    let details_output = render_app_to_string(&mut app, 120, 30);
+    // Cycle to year details focus with Tab
+    let details_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),
+        TuiTestFixture::key_event(KeyCode::Tab),
+    ]);
     assert_snapshot!("focus_year_details", details_output);
     
-    // Cycle back to file focus
-    app.cycle_focus();
-    let back_to_files = render_app_to_string(&mut app, 120, 30);
+    // Cycle back to file focus with Tab
+    let back_to_files = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),
+        TuiTestFixture::key_event(KeyCode::Tab),
+        TuiTestFixture::key_event(KeyCode::Tab),
+    ]);
     assert_snapshot!("focus_back_to_files", back_to_files);
 }
 
 #[test]
-fn test_year_navigation() {
+fn test_year_navigation_with_keys() {
     let fixture = TuiTestFixture::new();
-    let mut app = fixture.create_app();
     
-    // Switch to years focus
-    app.cycle_focus();
-    
-    // Navigate through years
-    app.previous(); // Should move to previous year (2024)
-    let year_2024_output = render_app_to_string(&mut app, 120, 30);
+    // Switch to years focus and navigate through years
+    let year_2024_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),       // Switch to years focus
+        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to previous year (2024)
+    ]);
     assert_snapshot!("year_navigation_2024", year_2024_output);
     
-    app.next(); // Move back to 2025
-    let year_2025_output = render_app_to_string(&mut app, 120, 30);
+    let year_2025_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),     // Switch to years focus
+        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to 2024
+        TuiTestFixture::key_event(KeyCode::Up),      // Move back to 2025
+    ]);
     assert_snapshot!("year_navigation_2025", year_2025_output);
 }
 
 #[test]
-fn test_entry_navigation() {
+fn test_entry_navigation_with_keys() {
     let fixture = TuiTestFixture::new();
-    let mut app = fixture.create_app();
     
-    // Switch to entry details focus
-    app.cycle_focus(); // Years
-    app.cycle_focus(); // Year details
-    
-    // Navigate through entries in the selected year
-    app.next(); // Move to next entry
-    let entry_1_output = render_app_to_string(&mut app, 120, 30);
+    // Switch to entry details focus and navigate through entries
+    let entry_1_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),       // Years focus
+        TuiTestFixture::key_event(KeyCode::Tab),       // Year details focus
+        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to next entry
+    ]);
     assert_snapshot!("entry_navigation_1", entry_1_output);
     
-    app.previous(); // Move back to first entry
-    let entry_0_output = render_app_to_string(&mut app, 120, 30);
+    let entry_0_output = fixture.run_with_events(vec![
+        TuiTestFixture::key_event(KeyCode::Tab),       // Years focus
+        TuiTestFixture::key_event(KeyCode::Tab),       // Year details focus  
+        TuiTestFixture::key_event(KeyCode::Down),      // Move to next entry
+        TuiTestFixture::key_event(KeyCode::Char('k')), // Move back to first entry
+    ]);
     assert_snapshot!("entry_navigation_0", entry_0_output);
 }
