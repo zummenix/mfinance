@@ -3,10 +3,10 @@ pub mod tui;
 
 use csv::ReaderBuilder;
 use rust_decimal::Decimal;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-const DELIMITER: u8 = b';';
+pub const DELIMITER: u8 = b';';
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Entry {
@@ -56,4 +56,19 @@ pub fn entries_from_file(path: &Path) -> Result<Vec<Entry>, AppError> {
         .deserialize::<Entry>()
         .collect::<Result<Vec<_>, _>>()?;
     Ok(entries)
+}
+
+pub fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut files = std::fs::read_dir(dir)?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension()?.to_str()? == "csv" {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    Ok(files)
 }
