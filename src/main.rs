@@ -99,16 +99,18 @@ fn main() -> Result<(), main_error::MainError> {
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
             entries.sort_by(|a, b| a.date.cmp(&b.date));
-            let mut writer = WriterBuilder::new().delimiter(mfinance::DELIMITER).from_writer(
-                OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .open(&file)
-                    .map_err(|source| AppError::Io {
-                        source,
-                        context: String::from("Failed to open file when saving sorted csv"),
-                    })?,
-            );
+            let mut writer = WriterBuilder::new()
+                .delimiter(mfinance::DELIMITER)
+                .from_writer(
+                    OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .open(&file)
+                        .map_err(|source| AppError::Io {
+                            source,
+                            context: String::from("Failed to open file when saving sorted csv"),
+                        })?,
+                );
 
             for entry in entries {
                 writer.serialize(entry)?;

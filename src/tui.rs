@@ -24,20 +24,35 @@ use std::{
 fn handle_key_event(app: &mut App, key: KeyCode) -> bool {
     match key {
         KeyCode::Char('q') => true, // quit
-        KeyCode::Down => { app.next(); false },
-        KeyCode::Char('j') => { app.next(); false },
-        KeyCode::Up => { app.previous(); false },
-        KeyCode::Char('k') => { app.previous(); false },
-        KeyCode::Tab => { app.cycle_focus(); false },
+        KeyCode::Down => {
+            app.next();
+            false
+        }
+        KeyCode::Char('j') => {
+            app.next();
+            false
+        }
+        KeyCode::Up => {
+            app.previous();
+            false
+        }
+        KeyCode::Char('k') => {
+            app.previous();
+            false
+        }
+        KeyCode::Tab => {
+            app.cycle_focus();
+            false
+        }
         _ => false,
     }
 }
 
 /// Core TUI loop that works with any backend and event source
 fn run_tui_loop<B, E>(
-    terminal: &mut Terminal<B>, 
-    app: &mut App, 
-    events: E
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+    events: E,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     B: ratatui::backend::Backend,
@@ -45,7 +60,7 @@ where
 {
     // Draw initial state
     terminal.draw(|f| ui(f, app))?;
-    
+
     // Process events
     for event in events {
         if let Event::Key(key) = event
@@ -56,11 +71,11 @@ where
                 break;
             }
         }
-        
+
         // Redraw after each event
         terminal.draw(|f| ui(f, app))?;
     }
-    
+
     Ok(())
 }
 
@@ -77,11 +92,9 @@ pub fn run_tui(
     let mut app = App::new(files, format_options);
 
     // Event iterator that reads from stdin until quit
-    let events = std::iter::from_fn(|| {
-        match event::read() {
-            Ok(event) => Some(event),
-            Err(_) => None,
-        }
+    let events = std::iter::from_fn(|| match event::read() {
+        Ok(event) => Some(event),
+        Err(_) => None,
     });
 
     let res = run_tui_loop(&mut terminal, &mut app, events);
@@ -99,16 +112,15 @@ pub fn run_tui_with_events_test(
     events: impl IntoIterator<Item = Event>,
     width: u16,
     height: u16,
-) -> Result<String, Box<dyn std::error::Error>>
-{
+) -> Result<String, Box<dyn std::error::Error>> {
     use ratatui::backend::TestBackend;
-    
+
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend)?;
     let mut app = App::new(files, format_options);
-    
+
     run_tui_loop(&mut terminal, &mut app, events)?;
-    
+
     // Return buffer content
     Ok(format!("{:?}", terminal.backend().buffer()))
 }
