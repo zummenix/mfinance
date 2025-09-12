@@ -92,10 +92,7 @@ pub fn run_tui(
     let mut app = App::new(files, format_options);
 
     // Event iterator that reads from stdin until quit
-    let events = std::iter::from_fn(|| match event::read() {
-        Ok(event) => Some(event),
-        Err(_) => None,
-    });
+    let events = std::iter::from_fn(|| event::read().ok());
 
     let res = run_tui_loop(&mut terminal, &mut app, events);
 
