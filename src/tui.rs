@@ -62,7 +62,7 @@ enum Focus {
     YearDetails,
 }
 
-struct App {
+pub struct App {
     files: Vec<PathBuf>,
     format_options: FormatOptions,
     selected_file: usize,
@@ -123,7 +123,7 @@ impl ReportViewModel {
 }
 
 impl App {
-    fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
+    pub fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
         let mut app = Self {
             files,
             format_options,
@@ -137,7 +137,7 @@ impl App {
         app
     }
 
-    fn cycle_focus(&mut self) {
+    pub fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             Focus::FileSelection => Focus::Years,
             Focus::Years => Focus::YearDetails,
@@ -147,7 +147,7 @@ impl App {
         self.selected_entry = 0;
     }
 
-    fn next(&mut self) {
+    pub fn next(&mut self) {
         match self.focus {
             Focus::FileSelection => {
                 if self.selected_file + 1 >= self.files.len() {
@@ -181,7 +181,7 @@ impl App {
         }
     }
 
-    fn previous(&mut self) {
+    pub fn previous(&mut self) {
         match self.focus {
             Focus::FileSelection => {
                 if self.selected_file == 0 {
@@ -243,7 +243,7 @@ impl App {
     }
 }
 
-fn ui(frame: &mut Frame, app: &mut App) {
+pub fn ui(frame: &mut Frame, app: &mut App) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(3), Constraint::Length(3)])
