@@ -1,0 +1,50 @@
+---
+source: tests/tui.rs
+expression: output_file3
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 120, height: 30 },
+    content: [
+        "╔ Files ════════════════════════════════╗┌ savings.csv ────────────────────────┐┌ 2024 ────────────────────────────────┐",
+        "║ expenses.csv                          ║│ 2024                       1 500.00 ││ 2024-06-15                    500.00 │",
+        "║ income.csv                            ║│                                     ││ 2024-12-31                  1 000.00 │",
+        "║ savings.csv                  1 500.00 ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "║                                       ║│                                     ││                                      │",
+        "╚═══════════════════════════════════════╝└─────────────────────────────────────┘└──────────────────────────────────────┘",
+        "┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐",
+        "│↓(j)/↑(k): Navigate | Tab: Focus | q: Quit                                                                            │",
+        "└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 1, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: BOLD,
+        x: 8, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 42, y: 1, fg: Reset, bg: DarkGray, underline: Reset, modifier: NONE,
+        x: 79, y: 1, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 81, y: 1, fg: Reset, bg: DarkGray, underline: Reset, modifier: NONE,
+        x: 119, y: 1, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 1, y: 3, fg: Black, bg: Blue, underline: Reset, modifier: NONE,
+        x: 40, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+    ]
+}

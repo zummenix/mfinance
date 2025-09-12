@@ -1,15 +1,15 @@
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
-use csv::{ReaderBuilder, WriterBuilder};
+use csv::WriterBuilder;
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
-use thiserror::Error;
 
 mod number_formatter;
 mod tui;
 
+use mfinance::{AppError, Entry, entries_from_file};
 use number_formatter::{FormatOptions, NumberFormatter};
 
 const DELIMITER: u8 = b';';
@@ -61,12 +61,6 @@ enum Commands {
     },
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct Entry {
-    date: String,
-    amount: Decimal,
-}
-
 fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
     let format_options = FormatOptions::default();
@@ -93,7 +87,7 @@ fn main() -> Result<(), main_error::MainError> {
             print!("{}", report.display(format_options));
         }
         Commands::Tui { path } => {
-            let files = get_csv_files(&path)?;
+            let files = mfinance::get_csv_files(&path)?;
             if files.is_empty() {
                 return Err(main_error::MainError::from(AppError::Io {
                     source: std::io::Error::new(std::io::ErrorKind::NotFound, "No CSV files found"),
@@ -105,16 +99,18 @@ fn main() -> Result<(), main_error::MainError> {
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
             entries.sort_by(|a, b| a.date.cmp(&b.date));
-            let mut writer = WriterBuilder::new().delimiter(DELIMITER).from_writer(
-                OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .open(&file)
-                    .map_err(|source| AppError::Io {
-                        source,
-                        context: String::from("Failed to open file when saving sorted csv"),
-                    })?,
-            );
+            let mut writer = WriterBuilder::new()
+                .delimiter(mfinance::DELIMITER)
+                .from_writer(
+                    OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .open(&file)
+                        .map_err(|source| AppError::Io {
+                            source,
+                            context: String::from("Failed to open file when saving sorted csv"),
+                        })?,
+                );
 
             for entry in entries {
                 writer.serialize(entry)?;
@@ -127,34 +123,6 @@ fn main() -> Result<(), main_error::MainError> {
     }
 
     Ok(())
-}
-
-#[derive(Debug, Error)]
-enum AppError {
-    #[error("I/O error: {context}")]
-    Io {
-        #[source]
-        source: std::io::Error,
-        context: String,
-    },
-
-    #[error("CSV error: {source}")]
-    Csv {
-        #[from]
-        source: csv::Error,
-    },
-
-    #[error("Invalid date format: {input} ({source})")]
-    DateParse {
-        source: chrono::format::ParseError,
-        input: String,
-    },
-
-    #[error("No entries found")]
-    NoEntries,
-
-    #[error("No entries matching filter: {0}")]
-    FilteredNoEntries(String),
 }
 
 fn add_entry(file_path: &Path, date: NaiveDate, amount: Decimal) -> Result<NewEntryInfo, AppError> {
@@ -232,22 +200,6 @@ impl<'a> Display for NewEntryInfoDisplay<'a> {
         writeln!(f, "{total_after_line:>max_len$}")?;
         Ok(())
     }
-}
-
-fn entries_from_file(path: &Path) -> Result<Vec<Entry>, AppError> {
-    std::fs::metadata(path).map_err(|e| AppError::Io {
-        source: e,
-        context: format!("Failed to access file: {}", path.display()),
-    })?;
-
-    let mut reader = ReaderBuilder::new()
-        .delimiter(DELIMITER)
-        .from_path(path)
-        .map_err(|source| AppError::Csv { source })?;
-    let entries = reader
-        .deserialize::<Entry>()
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(entries)
 }
 
 fn generate_report(file_path: &Path, date_filter: &str) -> Result<Report, AppError> {
@@ -335,19 +287,4 @@ impl<'a> Display for ReportDisplay<'a> {
 
         Ok(())
     }
-}
-
-fn get_csv_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-    let mut files = std::fs::read_dir(dir)?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.extension()?.to_str()? == "csv" {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
 }
