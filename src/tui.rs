@@ -20,60 +20,52 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Process a single key event and update the app state
-fn handle_key_event(app: &mut App, key: KeyCode) -> bool {
-    match key {
-        KeyCode::Char('q') => true, // quit
-        KeyCode::Down => {
-            app.next();
-            false
-        }
-        KeyCode::Char('j') => {
-            app.next();
-            false
-        }
-        KeyCode::Up => {
-            app.previous();
-            false
-        }
-        KeyCode::Char('k') => {
-            app.previous();
-            false
-        }
-        KeyCode::Tab => {
-            app.cycle_focus();
-            false
-        }
-        _ => false,
-    }
-}
-
 /// Core TUI loop that works with any backend and event source
-fn run_tui_loop<B, E>(
+///
+/// Exposed mostly for integration tests.
+pub fn run_tui_loop<B, E>(
+    files: Vec<PathBuf>,
+    format_options: FormatOptions,
     terminal: &mut Terminal<B>,
-    app: &mut App,
     events: E,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     B: ratatui::backend::Backend,
     E: IntoIterator<Item = Event>,
 {
+    let mut app = App::new(files, format_options);
+
     // Draw initial state
-    terminal.draw(|f| ui(f, app))?;
+    terminal.draw(|f| ui(f, &mut app))?;
 
     // Process events
     for event in events {
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
-            let should_quit = handle_key_event(app, key.code);
-            if should_quit {
-                break;
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Down => {
+                    app.next();
+                }
+                KeyCode::Char('j') => {
+                    app.next();
+                }
+                KeyCode::Up => {
+                    app.previous();
+                }
+                KeyCode::Char('k') => {
+                    app.previous();
+                }
+                KeyCode::Tab => {
+                    app.cycle_focus();
+                }
+                _ => {}
             }
         }
 
         // Redraw after each event
-        terminal.draw(|f| ui(f, app))?;
+        terminal.draw(|f| ui(f, &mut app))?;
     }
 
     Ok(())
@@ -89,37 +81,14 @@ pub fn run_tui(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(files, format_options);
-
     // Event iterator that reads from stdin until quit
     let events = std::iter::from_fn(|| event::read().ok());
 
-    let res = run_tui_loop(&mut terminal, &mut app, events);
+    let res = run_tui_loop(files, format_options, &mut terminal, events);
 
     disable_raw_mode()?;
     execute!(std::io::stdout(), LeaveAlternateScreen)?;
     res
-}
-
-/// Testable version that accepts a backend and event iterator  
-/// For testing with TestBackend - returns rendered buffer as string
-pub fn run_tui_with_events_test(
-    files: Vec<PathBuf>,
-    format_options: FormatOptions,
-    events: impl IntoIterator<Item = Event>,
-    width: u16,
-    height: u16,
-) -> Result<String, Box<dyn std::error::Error>> {
-    use ratatui::backend::TestBackend;
-
-    let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend)?;
-    let mut app = App::new(files, format_options);
-
-    run_tui_loop(&mut terminal, &mut app, events)?;
-
-    // Return buffer content
-    Ok(format!("{:?}", terminal.backend().buffer()))
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

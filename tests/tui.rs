@@ -1,6 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use insta::assert_snapshot;
-use mfinance::{number_formatter::FormatOptions, tui::run_tui_with_events_test};
+use mfinance::{number_formatter::FormatOptions, tui::run_tui_loop};
+use ratatui::{Terminal, backend::TestBackend};
 use std::{fs, path::PathBuf};
 use temp_dir::TempDir;
 
@@ -57,14 +58,15 @@ impl TuiTestFixture {
 
     /// Run TUI with events and return final buffer content
     fn run_with_events(&self, events: Vec<Event>) -> String {
-        run_tui_with_events_test(
-            self.files.clone(),
-            Self::format_options(),
-            events,
-            120, // width
-            30,  // height
-        )
-        .expect("TUI should run without error")
+        let files = self.files.clone();
+        let format_options = Self::format_options();
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).expect("terminal created");
+
+        run_tui_loop(files, format_options, &mut terminal, events)
+            .expect("tui loop finished successfully");
+
+        format!("{:?}", terminal.backend().buffer())
     }
 }
 
