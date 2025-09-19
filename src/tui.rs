@@ -20,6 +20,57 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Core TUI loop that works with any backend and event source
+///
+/// Exposed mostly for integration tests.
+pub fn run_tui_loop<B, E>(
+    files: Vec<PathBuf>,
+    format_options: FormatOptions,
+    terminal: &mut Terminal<B>,
+    events: E,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    B: ratatui::backend::Backend,
+    E: IntoIterator<Item = Event>,
+{
+    let mut app = App::new(files, format_options);
+
+    // Draw initial state
+    terminal.draw(|f| ui(f, &mut app))?;
+
+    // Process events
+    for event in events {
+        if let Event::Key(key) = event
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Down => {
+                    app.next();
+                }
+                KeyCode::Char('j') => {
+                    app.next();
+                }
+                KeyCode::Up => {
+                    app.previous();
+                }
+                KeyCode::Char('k') => {
+                    app.previous();
+                }
+                KeyCode::Tab => {
+                    app.cycle_focus();
+                }
+                _ => {}
+            }
+        }
+
+        // Redraw after each event
+        terminal.draw(|f| ui(f, &mut app))?;
+    }
+
+    Ok(())
+}
+
 pub fn run_tui(
     files: Vec<PathBuf>,
     format_options: FormatOptions,
@@ -30,25 +81,10 @@ pub fn run_tui(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(files, format_options);
+    // Event iterator that reads from stdin until quit
+    let events = std::iter::from_fn(|| event::read().ok());
 
-    let res = loop {
-        terminal.draw(|f| ui(f, &mut app))?;
-
-        if let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            match key.code {
-                KeyCode::Char('q') => break Ok(()),
-                KeyCode::Down => app.next(),
-                KeyCode::Char('j') => app.next(),
-                KeyCode::Up => app.previous(),
-                KeyCode::Char('k') => app.previous(),
-                KeyCode::Tab => app.cycle_focus(),
-                _ => {}
-            }
-        }
-    };
+    let res = run_tui_loop(files, format_options, &mut terminal, events);
 
     disable_raw_mode()?;
     execute!(std::io::stdout(), LeaveAlternateScreen)?;
