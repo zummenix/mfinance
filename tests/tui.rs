@@ -60,7 +60,7 @@ impl TuiTestFixture {
     fn run_with_events(&self, events: Vec<Event>) -> String {
         let files = self.files.clone();
         let format_options = Self::format_options();
-        let backend = TestBackend::new(120, 30);
+        let backend = TestBackend::new(86, 20);
         let mut terminal = Terminal::new(backend).expect("terminal created");
 
         run_tui_loop(files, format_options, &mut terminal, events)
@@ -97,7 +97,8 @@ fn test_file_navigation_with_keys() {
 
     let output_wrapped = fixture.run_with_events(vec![
         TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
-        TuiTestFixture::key_event(KeyCode::Down),      // Move to third file
+        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to first file
+        TuiTestFixture::key_event(KeyCode::Up),        // Should wrap to last file
         TuiTestFixture::key_event(KeyCode::Char('j')), // Should wrap to first file
     ]);
     assert_snapshot!("file_navigation_wrapped", output_wrapped);
