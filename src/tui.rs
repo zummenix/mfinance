@@ -20,6 +20,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const FOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x001a1e24);
+const UNFOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x00232730);
+const SELECTION_INDICATOR_COLOR: Color = Color::Green;
+
 /// Core TUI loop that works with any backend and event source
 ///
 /// Exposed mostly for integration tests.
@@ -304,6 +308,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 ""
             },
             i == app.selected_file,
+            app.focus == Focus::FileSelection,
             files_width,
         ))
     });
@@ -312,14 +317,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let files_list = List::new(files)
         .block(app.create_block(Line::from(" Files "), Focus::FileSelection))
         .highlight_style(highlight_style);
-    frame.render_stateful_widget(
-        files_list,
-        content_layout[0],
-        &mut ListState::default().with_selected(match app.focus {
-            Focus::FileSelection => Some(app.selected_file),
-            _ => None,
-        }),
-    );
+    frame.render_stateful_widget(files_list, content_layout[0], &mut ListState::default());
 
     // Years list (middle column)
     let years_width = content_layout[1].width.saturating_sub(2) as usize; // Account for block borders
@@ -328,20 +326,14 @@ fn ui(frame: &mut Frame, app: &mut App) {
             &year.title,
             &year.subtotal_amount,
             i == app.selected_year,
+            app.focus == Focus::Years,
             years_width,
         ))
     }))
     .block(app.create_block(Line::from(format!(" {} ", app.report.title)), Focus::Years))
     .highlight_style(highlight_style);
 
-    frame.render_stateful_widget(
-        years_list,
-        content_layout[1],
-        &mut ListState::default().with_selected(match app.focus {
-            Focus::Years => Some(app.selected_year),
-            _ => None,
-        }),
-    );
+    frame.render_stateful_widget(years_list, content_layout[1], &mut ListState::default());
 
     // Entries list (right column)
     let entries_width = content_layout[2].width.saturating_sub(2) as usize; // Account for block borders
@@ -352,6 +344,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 date,
                 amount,
                 i == app.selected_entry,
+                app.focus == Focus::YearDetails,
                 entries_width,
             ))
         },
@@ -362,14 +355,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     ))
     .highlight_style(highlight_style);
 
-    frame.render_stateful_widget(
-        entries_list,
-        content_layout[2],
-        &mut ListState::default().with_selected(match app.focus {
-            Focus::YearDetails => Some(app.selected_entry),
-            _ => None,
-        }),
-    );
+    frame.render_stateful_widget(entries_list, content_layout[2], &mut ListState::default());
 
     let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
         .block(Block::default().borders(Borders::ALL));
@@ -380,23 +366,41 @@ fn make_line<'a>(
     left: impl Into<std::borrow::Cow<'a, str>>,
     right: &'a str,
     is_selected: bool,
+    is_focused: bool,
     width: usize,
 ) -> Line<'a> {
-    let padding_span = Span::raw(" ");
+    let padding_span_left = if is_selected {
+        if is_focused {
+            Span::raw("▌").style(SELECTION_INDICATOR_COLOR)
+        } else {
+            Span::raw("▎")
+        }
+    } else {
+        Span::raw(" ")
+    };
+    let padding_span_right = Span::raw(" ");
     let left_span = Span::raw(left);
     let right_span = Span::raw(right);
-    let spacer = " ".repeat(
-        width.saturating_sub(left_span.width() + right_span.width() + padding_span.width() * 2),
-    );
+    let spacer = " ".repeat(width.saturating_sub(
+        left_span.width()
+            + right_span.width()
+            + padding_span_left.width()
+            + padding_span_right.width(),
+    ));
     let line = Line::from(vec![
-        padding_span.clone(),
+        padding_span_left,
         left_span,
         Span::raw(spacer),
         right_span,
-        padding_span,
+        padding_span_right,
     ]);
     if is_selected {
-        line.style(Style::default().bg(Color::DarkGray))
+        let bg_color = if is_focused {
+            FOCUSED_SELECTION_BG_COLOR
+        } else {
+            UNFOCUSED_SELECTION_BG_COLOR
+        };
+        line.style(Style::default().bg(bg_color))
     } else {
         line
     }
