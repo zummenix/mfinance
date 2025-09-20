@@ -1,5 +1,5 @@
 use crate::{
-    Entry, entries_from_file,
+    DELIMITER, Entry, entries_from_file,
     number_formatter::{FormatOptions, NumberFormatter},
 };
 use chrono::Datelike;
@@ -9,16 +9,21 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use csv::WriterBuilder;
 use ratatui::{
     Terminal,
+    layout::Position as CursorPosition,
     prelude::*,
     widgets::{block::*, *},
 };
 use rust_decimal::Decimal;
 use std::{
     collections::BTreeMap,
+    fs::OpenOptions,
     path::{Path, PathBuf},
+    str::FromStr,
 };
+use tui_input::{Input, backend::crossterm::EventHandler};
 
 const FOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x001a1e24);
 const UNFOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x00232730);
@@ -47,24 +52,53 @@ where
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
-            match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Down => {
-                    app.next();
+            match app.popup_mode {
+                PopupMode::None => {
+                    // Normal navigation mode
+                    match key.code {
+                        KeyCode::Char('q') => break,
+                        KeyCode::Char('a') => {
+                            app.open_add_entry_popup();
+                        }
+                        KeyCode::Char('e') => {
+                            app.open_edit_entry_popup();
+                        }
+                        KeyCode::Down => {
+                            app.next();
+                        }
+                        KeyCode::Char('j') => {
+                            app.next();
+                        }
+                        KeyCode::Up => {
+                            app.previous();
+                        }
+                        KeyCode::Char('k') => {
+                            app.previous();
+                        }
+                        KeyCode::Tab => {
+                            app.cycle_focus();
+                        }
+                        _ => {}
+                    }
                 }
-                KeyCode::Char('j') => {
-                    app.next();
+                PopupMode::AddEntry | PopupMode::EditEntry => {
+                    // Popup input mode
+                    match key.code {
+                        KeyCode::Char('q') => {
+                            app.close_popup();
+                        }
+                        KeyCode::Tab => {
+                            app.cycle_popup_focus();
+                        }
+                        KeyCode::Enter => {
+                            app.handle_saving_popup_entry();
+                        }
+                        KeyCode::Backspace | KeyCode::Char(_) => {
+                            app.handle_popup_input(key);
+                        }
+                        _ => {}
+                    }
                 }
-                KeyCode::Up => {
-                    app.previous();
-                }
-                KeyCode::Char('k') => {
-                    app.previous();
-                }
-                KeyCode::Tab => {
-                    app.cycle_focus();
-                }
-                _ => {}
             }
         }
 
@@ -102,6 +136,19 @@ enum Focus {
     YearDetails,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum PopupMode {
+    None,
+    AddEntry,
+    EditEntry,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum PopupFocus {
+    Date,
+    Amount,
+}
+
 struct App {
     files: Vec<PathBuf>,
     format_options: FormatOptions,
@@ -110,6 +157,12 @@ struct App {
     focus: Focus,
     selected_year: usize,
     selected_entry: usize,
+    // Popup state
+    popup_mode: PopupMode,
+    popup_focus: PopupFocus,
+    popup_date_input: Input,
+    popup_amount_input: Input,
+    popup_error_message: Option<String>,
 }
 
 #[derive(Default)]
@@ -123,6 +176,7 @@ struct YearReportViewModel {
     title: String,
     subtotal_amount: String,
     lines: Vec<(String, String)>,
+    entries: Vec<Entry>, // Store raw entries for editing
 }
 
 impl ReportViewModel {
@@ -148,13 +202,15 @@ impl ReportViewModel {
                 .into_iter()
                 .map(|(year, entries)| {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
+                    let lines: Vec<(String, String)> = entries
+                        .iter()
+                        .map(|entry| (entry.date.clone(), entry.amount.format(format_options)))
+                        .collect();
                     YearReportViewModel {
                         title: year,
                         subtotal_amount: subtotal_amount.format(format_options),
-                        lines: entries
-                            .into_iter()
-                            .map(|entry| (entry.date, entry.amount.format(format_options)))
-                            .collect(),
+                        lines,
+                        entries,
                     }
                 })
                 .collect(),
@@ -172,6 +228,11 @@ impl App {
             report: ReportViewModel::default(),
             selected_year: 0,
             selected_entry: 0,
+            popup_mode: PopupMode::None,
+            popup_focus: PopupFocus::Date,
+            popup_date_input: Input::default(),
+            popup_amount_input: Input::default(),
+            popup_error_message: None,
         };
         app.select_file();
         app
@@ -268,18 +329,207 @@ impl App {
     }
 
     fn create_block<'a>(&self, title: Line<'a>, focus_area: Focus) -> Block<'a> {
+        let is_focused = self.focus == focus_area && self.popup_mode == PopupMode::None;
         Block::default()
-            .title(title.add_modifier(if self.focus == focus_area {
+            .title(title.add_modifier(if is_focused {
                 Modifier::BOLD
             } else {
                 Modifier::empty()
             }))
             .borders(Borders::ALL)
-            .border_type(if self.focus == focus_area {
+            .border_type(if is_focused {
                 BorderType::Double
             } else {
                 BorderType::Plain
             })
+    }
+
+    fn open_add_entry_popup(&mut self) {
+        self.popup_mode = PopupMode::AddEntry;
+        self.popup_focus = PopupFocus::Date;
+        // Set current date as default
+        self.popup_date_input = Input::new(chrono::Local::now().date_naive().to_string());
+        self.popup_amount_input = Input::default();
+        self.popup_error_message = None;
+    }
+
+    fn open_edit_entry_popup(&mut self) {
+        if let Some(selected_entry) = self.get_selected_entry() {
+            let date_input = selected_entry.date.clone();
+            let amount_input = selected_entry.amount.to_string();
+
+            self.popup_mode = PopupMode::EditEntry;
+            self.popup_focus = PopupFocus::Date;
+            self.popup_date_input = Input::new(date_input);
+            self.popup_amount_input = Input::new(amount_input);
+            self.popup_error_message = None;
+        }
+    }
+
+    fn close_popup(&mut self) {
+        self.popup_mode = PopupMode::None;
+        self.popup_date_input = Input::default();
+        self.popup_amount_input = Input::default();
+        self.popup_error_message = None;
+    }
+
+    fn get_selected_entry(&self) -> Option<&Entry> {
+        self.report
+            .year_reports
+            .get(self.selected_year)?
+            .entries
+            .get(self.selected_entry)
+    }
+
+    fn cycle_popup_focus(&mut self) {
+        self.popup_focus = match self.popup_focus {
+            PopupFocus::Date => PopupFocus::Amount,
+            PopupFocus::Amount => PopupFocus::Date,
+        };
+    }
+
+    fn handle_popup_input(&mut self, key_event: crossterm::event::KeyEvent) {
+        // Clear error message when user starts typing
+        if matches!(key_event.code, KeyCode::Char(_) | KeyCode::Backspace) {
+            self.popup_error_message = None;
+        }
+
+        match self.popup_focus {
+            PopupFocus::Date => {
+                self.popup_date_input.handle_event(&Event::Key(key_event));
+                // Ensure date doesn't exceed 10 characters (YYYY-MM-DD format)
+                if self.popup_date_input.value().len() > 10 {
+                    let truncated = self.popup_date_input.value()[..10].to_string();
+                    self.popup_date_input = Input::new(truncated).with_cursor(10);
+                }
+            }
+            PopupFocus::Amount => {
+                // For amount field, we need to validate input
+                let key = key_event.code;
+                match key {
+                    KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
+                        // Only allow minus at the beginning
+                        if c == '-' && !self.popup_amount_input.value().is_empty() {
+                            return;
+                        }
+                        self.popup_amount_input.handle_event(&Event::Key(key_event));
+                    }
+                    KeyCode::Backspace => {
+                        self.popup_amount_input.handle_event(&Event::Key(key_event));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn handle_saving_popup_entry(&mut self) {
+        // Clear any previous error message
+        self.popup_error_message = None;
+
+        // Validate inputs
+        let date = match NaiveDate::parse_from_str(self.popup_date_input.value(), "%Y-%m-%d") {
+            Ok(date) => date,
+            Err(_) => {
+                self.popup_error_message = Some("Invalid date format. Use YYYY-MM-DD".to_string());
+                return;
+            }
+        };
+
+        let amount = match Decimal::from_str(self.popup_amount_input.value()) {
+            Ok(amount) => amount,
+            Err(_) => {
+                self.popup_error_message =
+                    Some("Invalid amount format. Use decimal number".to_string());
+                return;
+            }
+        };
+
+        let file_path = &self.files[self.selected_file];
+
+        let result = match self.popup_mode {
+            PopupMode::AddEntry => self.add_entry_to_file(file_path, date, amount),
+            PopupMode::EditEntry => self.edit_entry_in_file(file_path, date, amount),
+            PopupMode::None => Ok(()),
+        };
+
+        match result {
+            Ok(()) => {
+                // Success - refresh the report and close popup
+                self.select_file();
+                self.close_popup();
+            }
+            Err(e) => {
+                // Error - show error message and keep popup open
+                self.popup_error_message = Some(format!("Failed to save: {}", e));
+            }
+        }
+    }
+
+    fn add_entry_to_file(
+        &self,
+        file_path: &Path,
+        date: NaiveDate,
+        amount: Decimal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let entries = entries_from_file(file_path).unwrap_or_default();
+
+        let new_entry = Entry {
+            date: date.to_string(),
+            amount,
+        };
+
+        // Write to the end of the file
+        let mut writer = WriterBuilder::new()
+            .delimiter(DELIMITER)
+            .has_headers(entries.is_empty())
+            .from_writer(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(file_path)?,
+            );
+
+        writer.serialize(new_entry)?;
+        writer.flush()?;
+
+        Ok(())
+    }
+
+    fn edit_entry_in_file(
+        &self,
+        file_path: &Path,
+        date: NaiveDate,
+        amount: Decimal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut entries = entries_from_file(file_path)?;
+
+        // Find and update the entry
+        if let Some(selected_entry) = self.get_selected_entry() {
+            // Find the entry by matching date and amount (original values)
+            if let Some(entry_to_edit) = entries
+                .iter_mut()
+                .find(|e| e.date == selected_entry.date && e.amount == selected_entry.amount)
+            {
+                entry_to_edit.date = date.to_string();
+                entry_to_edit.amount = amount;
+
+                // Rewrite the entire file
+                let mut writer = WriterBuilder::new().delimiter(DELIMITER).from_writer(
+                    OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .open(file_path)?,
+                );
+
+                for entry in entries {
+                    writer.serialize(entry)?;
+                }
+                writer.flush()?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -308,7 +558,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 ""
             },
             i == app.selected_file,
-            app.focus == Focus::FileSelection,
+            app.focus == Focus::FileSelection && app.popup_mode == PopupMode::None,
             files_width,
         ))
     });
@@ -326,7 +576,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
             &year.title,
             &year.subtotal_amount,
             i == app.selected_year,
-            app.focus == Focus::Years,
+            app.focus == Focus::Years && app.popup_mode == PopupMode::None,
             years_width,
         ))
     }))
@@ -344,7 +594,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 date,
                 amount,
                 i == app.selected_entry,
-                app.focus == Focus::YearDetails,
+                app.focus == Focus::YearDetails && app.popup_mode == PopupMode::None,
                 entries_width,
             ))
         },
@@ -357,9 +607,142 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     frame.render_stateful_widget(entries_list, content_layout[2], &mut ListState::default());
 
-    let footer = Paragraph::new("↓(j)/↑(k): Navigate | Tab: Focus | q: Quit")
-        .block(Block::default().borders(Borders::ALL));
+    let footer_text = if app.popup_mode == PopupMode::None {
+        "↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit"
+    } else {
+        "Tab: Switch Field | Enter: Save | q: Cancel"
+    };
+    let footer = Paragraph::new(footer_text).block(Block::default().borders(Borders::ALL));
     frame.render_widget(footer, main_layout[1]);
+
+    // Render popup if active
+    if app.popup_mode != PopupMode::None {
+        render_popup(frame, app);
+    }
+}
+
+fn render_popup(frame: &mut Frame, app: &App) {
+    // Create a centered popup area
+    let area = frame.area();
+    let popup_area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Min(8),
+            Constraint::Percentage(30),
+        ])
+        .split(area)[1];
+
+    let popup_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Min(40),
+            Constraint::Percentage(20),
+        ])
+        .split(popup_area)[1];
+
+    // Clear the area
+    let clear_block = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(clear_block, popup_area);
+
+    // Create the popup content
+    let title = match app.popup_mode {
+        PopupMode::AddEntry => " Add New Entry ",
+        PopupMode::EditEntry => " Edit Entry ",
+        PopupMode::None => "",
+    };
+
+    let popup_block = Block::default()
+        .title(Line::from(title).add_modifier(Modifier::BOLD))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .style(Style::default().bg(Color::Black).fg(Color::White));
+
+    let inner_area = popup_block.inner(popup_area);
+    frame.render_widget(popup_block, popup_area);
+    let content_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // File name
+            Constraint::Length(1), // Empty line
+            Constraint::Length(1), // Date field
+            Constraint::Length(1), // Amount field
+            Constraint::Length(1), // Empty line or error message
+            Constraint::Min(1),    // Remaining space
+        ])
+        .split(inner_area);
+
+    // File name
+    let file_name = app.files[app.selected_file]
+        .file_name()
+        .unwrap()
+        .to_string_lossy();
+    let file_name_input = Input::new(file_name.into_owned());
+    render_input_field(frame, "File  ", &file_name_input, content_layout[0], false);
+
+    // Date field
+    render_input_field(
+        frame,
+        "Date  ",
+        &app.popup_date_input,
+        content_layout[2],
+        app.popup_focus == PopupFocus::Date,
+    );
+
+    // Amount field
+    render_input_field(
+        frame,
+        "Amount",
+        &app.popup_amount_input,
+        content_layout[3],
+        app.popup_focus == PopupFocus::Amount,
+    );
+
+    // Error message
+    if let Some(error_msg) = &app.popup_error_message {
+        let error_line = Line::from(vec![
+            Span::raw(" "),
+            Span::raw("Error: ").style(Style::default().fg(Color::Red)),
+            Span::raw(error_msg).style(Style::default().fg(Color::Red)),
+        ]);
+        frame.render_widget(Paragraph::new(error_line), content_layout[4]);
+    }
+}
+
+fn render_input_field(
+    frame: &mut Frame,
+    name: &str,
+    input: &Input,
+    layout: Rect,
+    is_focused: bool,
+) {
+    let style = if is_focused {
+        Style::default()
+            .bg(FOCUSED_SELECTION_BG_COLOR)
+            .fg(Color::White)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    let prefix = if is_focused {
+        Span::raw("▌").style(SELECTION_INDICATOR_COLOR)
+    } else {
+        Span::raw(" ")
+    };
+    let value_span = Span::raw(input.value());
+    let value_width = value_span.width() as u16;
+    let line = Line::from(vec![prefix, Span::raw(name), Span::raw("  "), value_span]).style(style);
+    let line_width = line.width() as u16;
+    frame.render_widget(line, layout);
+
+    if is_focused {
+        let cursor_pos = input.visual_cursor() as u16;
+        frame.set_cursor_position(CursorPosition {
+            x: layout.x + line_width - value_width + cursor_pos,
+            y: layout.y,
+        });
+    }
 }
 
 fn make_line<'a>(
