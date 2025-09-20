@@ -1,6 +1,6 @@
 ---
 source: tests/tui.rs
-expression: back_to_files
+expression: popup_close_output
 ---
 Buffer {
     area: Rect { x: 0, y: 0, width: 86, height: 20 },
