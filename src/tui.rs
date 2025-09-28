@@ -52,7 +52,7 @@ where
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
-            match app.popup_mode {
+            match app.popup.mode {
                 PopupMode::None => {
                     // Normal navigation mode
                     match key.code {
@@ -157,12 +157,27 @@ struct App {
     focus: Focus,
     selected_year: usize,
     selected_entry: usize,
-    // Popup state
-    popup_mode: PopupMode,
-    popup_focus: PopupFocus,
-    popup_date_input: Input,
-    popup_amount_input: Input,
-    popup_error_message: Option<String>,
+    popup: Popup,
+}
+
+struct Popup {
+    mode: PopupMode,
+    focus: PopupFocus,
+    date_input: Input,
+    amount_input: Input,
+    error_message: Option<String>,
+}
+
+impl Popup {
+    fn new() -> Self {
+        Popup {
+            mode: PopupMode::None,
+            focus: PopupFocus::Date,
+            date_input: Input::default(),
+            amount_input: Input::default(),
+            error_message: None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -228,11 +243,7 @@ impl App {
             report: ReportViewModel::default(),
             selected_year: 0,
             selected_entry: 0,
-            popup_mode: PopupMode::None,
-            popup_focus: PopupFocus::Date,
-            popup_date_input: Input::default(),
-            popup_amount_input: Input::default(),
-            popup_error_message: None,
+            popup: Popup::new(),
         };
         app.select_file();
         app
@@ -329,7 +340,7 @@ impl App {
     }
 
     fn create_block<'a>(&self, title: Line<'a>, focus_area: Focus) -> Block<'a> {
-        let is_focused = self.focus == focus_area && self.popup_mode == PopupMode::None;
+        let is_focused = self.focus == focus_area && self.popup.mode == PopupMode::None;
         Block::default()
             .title(title.add_modifier(if is_focused {
                 Modifier::BOLD
@@ -345,12 +356,12 @@ impl App {
     }
 
     fn open_add_entry_popup(&mut self) {
-        self.popup_mode = PopupMode::AddEntry;
-        self.popup_focus = PopupFocus::Date;
+        self.popup.mode = PopupMode::AddEntry;
+        self.popup.focus = PopupFocus::Date;
         // Set current date as default
-        self.popup_date_input = Input::new(chrono::Local::now().date_naive().to_string());
-        self.popup_amount_input = Input::default();
-        self.popup_error_message = None;
+        self.popup.date_input = Input::new(chrono::Local::now().date_naive().to_string());
+        self.popup.amount_input = Input::default();
+        self.popup.error_message = None;
     }
 
     fn open_edit_entry_popup(&mut self) {
@@ -358,19 +369,16 @@ impl App {
             let date_input = selected_entry.date.clone();
             let amount_input = selected_entry.amount.to_string();
 
-            self.popup_mode = PopupMode::EditEntry;
-            self.popup_focus = PopupFocus::Date;
-            self.popup_date_input = Input::new(date_input);
-            self.popup_amount_input = Input::new(amount_input);
-            self.popup_error_message = None;
+            self.popup.mode = PopupMode::EditEntry;
+            self.popup.focus = PopupFocus::Date;
+            self.popup.date_input = Input::new(date_input);
+            self.popup.amount_input = Input::new(amount_input);
+            self.popup.error_message = None;
         }
     }
 
     fn close_popup(&mut self) {
-        self.popup_mode = PopupMode::None;
-        self.popup_date_input = Input::default();
-        self.popup_amount_input = Input::default();
-        self.popup_error_message = None;
+        self.popup = Popup::new()
     }
 
     fn get_selected_entry(&self) -> Option<&Entry> {
@@ -382,7 +390,7 @@ impl App {
     }
 
     fn cycle_popup_focus(&mut self) {
-        self.popup_focus = match self.popup_focus {
+        self.popup.focus = match self.popup.focus {
             PopupFocus::Date => PopupFocus::Amount,
             PopupFocus::Amount => PopupFocus::Date,
         };
@@ -391,16 +399,16 @@ impl App {
     fn handle_popup_input(&mut self, key_event: crossterm::event::KeyEvent) {
         // Clear error message when user starts typing
         if matches!(key_event.code, KeyCode::Char(_) | KeyCode::Backspace) {
-            self.popup_error_message = None;
+            self.popup.error_message = None;
         }
 
-        match self.popup_focus {
+        match self.popup.focus {
             PopupFocus::Date => {
-                self.popup_date_input.handle_event(&Event::Key(key_event));
+                self.popup.date_input.handle_event(&Event::Key(key_event));
                 // Ensure date doesn't exceed 10 characters (YYYY-MM-DD format)
-                if self.popup_date_input.value().len() > 10 {
-                    let truncated = self.popup_date_input.value()[..10].to_string();
-                    self.popup_date_input = Input::new(truncated).with_cursor(10);
+                if self.popup.date_input.value().len() > 10 {
+                    let truncated = self.popup.date_input.value()[..10].to_string();
+                    self.popup.date_input = Input::new(truncated).with_cursor(10);
                 }
             }
             PopupFocus::Amount => {
@@ -409,13 +417,13 @@ impl App {
                 match key {
                     KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
                         // Only allow minus at the beginning
-                        if c == '-' && !self.popup_amount_input.value().is_empty() {
+                        if c == '-' && !self.popup.amount_input.value().is_empty() {
                             return;
                         }
-                        self.popup_amount_input.handle_event(&Event::Key(key_event));
+                        self.popup.amount_input.handle_event(&Event::Key(key_event));
                     }
                     KeyCode::Backspace => {
-                        self.popup_amount_input.handle_event(&Event::Key(key_event));
+                        self.popup.amount_input.handle_event(&Event::Key(key_event));
                     }
                     _ => {}
                 }
@@ -425,21 +433,21 @@ impl App {
 
     fn handle_saving_popup_entry(&mut self) {
         // Clear any previous error message
-        self.popup_error_message = None;
+        self.popup.error_message = None;
 
         // Validate inputs
-        let date = match NaiveDate::parse_from_str(self.popup_date_input.value(), "%Y-%m-%d") {
+        let date = match NaiveDate::parse_from_str(self.popup.date_input.value(), "%Y-%m-%d") {
             Ok(date) => date,
             Err(_) => {
-                self.popup_error_message = Some("Invalid date format. Use YYYY-MM-DD".to_string());
+                self.popup.error_message = Some("Invalid date format. Use YYYY-MM-DD".to_string());
                 return;
             }
         };
 
-        let amount = match Decimal::from_str(self.popup_amount_input.value()) {
+        let amount = match Decimal::from_str(self.popup.amount_input.value()) {
             Ok(amount) => amount,
             Err(_) => {
-                self.popup_error_message =
+                self.popup.error_message =
                     Some("Invalid amount format. Use decimal number".to_string());
                 return;
             }
@@ -447,7 +455,7 @@ impl App {
 
         let file_path = &self.files[self.selected_file];
 
-        let result = match self.popup_mode {
+        let result = match self.popup.mode {
             PopupMode::AddEntry => self.add_entry_to_file(file_path, date, amount),
             PopupMode::EditEntry => self.edit_entry_in_file(file_path, date, amount),
             PopupMode::None => Ok(()),
@@ -461,7 +469,7 @@ impl App {
             }
             Err(e) => {
                 // Error - show error message and keep popup open
-                self.popup_error_message = Some(format!("Failed to save: {}", e));
+                self.popup.error_message = Some(format!("Failed to save: {}", e));
             }
         }
     }
@@ -558,7 +566,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 ""
             },
             i == app.selected_file,
-            app.focus == Focus::FileSelection && app.popup_mode == PopupMode::None,
+            app.focus == Focus::FileSelection && app.popup.mode == PopupMode::None,
             files_width,
         ))
     });
@@ -576,7 +584,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
             &year.title,
             &year.subtotal_amount,
             i == app.selected_year,
-            app.focus == Focus::Years && app.popup_mode == PopupMode::None,
+            app.focus == Focus::Years && app.popup.mode == PopupMode::None,
             years_width,
         ))
     }))
@@ -594,7 +602,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 date,
                 amount,
                 i == app.selected_entry,
-                app.focus == Focus::YearDetails && app.popup_mode == PopupMode::None,
+                app.focus == Focus::YearDetails && app.popup.mode == PopupMode::None,
                 entries_width,
             ))
         },
@@ -607,7 +615,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     frame.render_stateful_widget(entries_list, content_layout[2], &mut ListState::default());
 
-    let footer_text = if app.popup_mode == PopupMode::None {
+    let footer_text = if app.popup.mode == PopupMode::None {
         "↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit"
     } else {
         "Tab: Switch Field | Enter: Save | q: Cancel"
@@ -616,7 +624,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(footer, main_layout[1]);
 
     // Render popup if active
-    if app.popup_mode != PopupMode::None {
+    if app.popup.mode != PopupMode::None {
         render_popup(frame, app);
     }
 }
@@ -648,7 +656,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(clear_block, popup_area);
 
     // Create the popup content
-    let title = match app.popup_mode {
+    let title = match app.popup.mode {
         PopupMode::AddEntry => " Add New Entry ",
         PopupMode::EditEntry => " Edit Entry ",
         PopupMode::None => "",
@@ -686,22 +694,22 @@ fn render_popup(frame: &mut Frame, app: &App) {
     render_input_field(
         frame,
         "Date  ",
-        &app.popup_date_input,
+        &app.popup.date_input,
         content_layout[2],
-        app.popup_focus == PopupFocus::Date,
+        app.popup.focus == PopupFocus::Date,
     );
 
     // Amount field
     render_input_field(
         frame,
         "Amount",
-        &app.popup_amount_input,
+        &app.popup.amount_input,
         content_layout[3],
-        app.popup_focus == PopupFocus::Amount,
+        app.popup.focus == PopupFocus::Amount,
     );
 
     // Error message
-    if let Some(error_msg) = &app.popup_error_message {
+    if let Some(error_msg) = &app.popup.error_message {
         let error_line = Line::from(vec![
             Span::raw(" "),
             Span::raw("Error: ").style(Style::default().fg(Color::Red)),
