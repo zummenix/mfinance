@@ -9,6 +9,7 @@ struct TuiTestFixture {
     #[allow(dead_code)] // Used to keep temp directory alive
     tempdir: TempDir,
     files: Vec<PathBuf>,
+    is_with_styles: bool,
 }
 
 impl TuiTestFixture {
@@ -39,40 +40,98 @@ impl TuiTestFixture {
         .expect("write savings.csv");
         files.push(file3_path);
 
-        TuiTestFixture { tempdir, files }
+        TuiTestFixture {
+            tempdir,
+            files,
+            is_with_styles: false,
+        }
     }
 
     fn format_options() -> FormatOptions {
         FormatOptions::default()
     }
 
-    /// Helper to create key event
-    fn key_event(code: KeyCode) -> Event {
-        Event::Key(KeyEvent {
-            code,
-            modifiers: crossterm::event::KeyModifiers::empty(),
-            kind: KeyEventKind::Press,
-            state: crossterm::event::KeyEventState::empty(),
-        })
-    }
-
     /// Run TUI with events and return final buffer content
-    fn run_with_events(&self, events: Vec<Event>) -> String {
+    fn run_with_events(&self, events: impl IntoIterator<Item = Vec<Event>>) -> String {
         let files = self.files.clone();
         let format_options = Self::format_options();
         let backend = TestBackend::new(86, 20);
         let mut terminal = Terminal::new(backend).expect("terminal created");
 
-        run_tui_loop(files, format_options, &mut terminal, events)
-            .expect("tui loop finished successfully");
+        run_tui_loop(
+            files,
+            format_options,
+            &mut terminal,
+            events.into_iter().flatten(),
+        )
+        .expect("tui loop finished successfully");
 
-        format!("{:?}", terminal.backend().buffer())
+        if self.is_with_styles {
+            format!("{:?}", terminal.backend().buffer())
+        } else {
+            format!("{}", terminal.backend())
+        }
     }
+}
+
+/// Helper to create key event
+fn key_event(code: KeyCode) -> Event {
+    Event::Key(KeyEvent {
+        code,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: crossterm::event::KeyEventState::empty(),
+    })
+}
+
+fn press_down() -> Vec<Event> {
+    vec![key_event(KeyCode::Down)]
+}
+
+fn press_up() -> Vec<Event> {
+    vec![key_event(KeyCode::Up)]
+}
+
+fn press_tab() -> Vec<Event> {
+    vec![key_event(KeyCode::Tab)]
+}
+
+fn press_backspace() -> Vec<Event> {
+    vec![key_event(KeyCode::Backspace)]
+}
+
+fn press_enter() -> Vec<Event> {
+    vec![key_event(KeyCode::Enter)]
+}
+
+fn press_add_entry() -> Vec<Event> {
+    vec![key_event(KeyCode::Char('a'))]
+}
+
+fn press_edit_entry() -> Vec<Event> {
+    vec![key_event(KeyCode::Char('e'))]
+}
+
+fn press_close_popup() -> Vec<Event> {
+    vec![key_event(KeyCode::Char('q'))]
+}
+
+fn type_text(s: &str) -> Vec<Event> {
+    s.chars().map(|ch| key_event(KeyCode::Char(ch))).collect()
+}
+
+fn repeat(events: Vec<Event>, n_times: usize) -> Vec<Event> {
+    let mut result: Vec<Event> = Vec::with_capacity(events.len() * n_times);
+    for _ in 0..n_times {
+        result.extend(events.iter().cloned());
+    }
+    result
 }
 
 #[test]
 fn test_initial_display() {
-    let fixture = TuiTestFixture::new();
+    let mut fixture = TuiTestFixture::new();
+    fixture.is_with_styles = true;
 
     // Test initial state with no events
     let output = fixture.run_with_events(vec![]);
@@ -80,113 +139,253 @@ fn test_initial_display() {
 }
 
 #[test]
-fn test_file_navigation_with_keys() {
+fn test_down_or_j() {
     let fixture = TuiTestFixture::new();
 
-    // Test navigation through files with j/k keys
-    let output_file2 = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
-    ]);
-    assert_snapshot!("file_navigation_second", output_file2);
+    let output = fixture.run_with_events(vec![type_text("j"), press_down()]);
 
-    let output_file3 = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
-        TuiTestFixture::key_event(KeyCode::Down),      // Move to third file
-    ]);
-    assert_snapshot!("file_navigation_third", output_file3);
-
-    let output_wrapped = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to second file
-        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to first file
-        TuiTestFixture::key_event(KeyCode::Up),        // Should wrap to last file
-        TuiTestFixture::key_event(KeyCode::Char('j')), // Should wrap to first file
-    ]);
-    assert_snapshot!("file_navigation_wrapped", output_wrapped);
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ savings.csv ──────────────┐┌ 2024 ────────────────────┐"
+    "║ expenses.csv              ║│▎2024             1 500.00 ││▎2024-06-15        500.00 │"
+    "║ income.csv                ║│                           ││ 2024-12-31      1 000.00 │"
+    "║▌savings.csv      1 500.00 ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "╚═══════════════════════════╝└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
-fn test_focus_cycling_with_tab() {
+fn test_up_or_k() {
     let fixture = TuiTestFixture::new();
 
-    // Initial focus should be on file selection
-    let initial_output = fixture.run_with_events(vec![]);
-    assert_snapshot!("focus_files", initial_output);
+    let output = fixture.run_with_events(vec![type_text("k"), press_up()]);
 
-    // Cycle to years focus with Tab
-    let years_output = fixture.run_with_events(vec![TuiTestFixture::key_event(KeyCode::Tab)]);
-    assert_snapshot!("focus_years", years_output);
-
-    // Cycle to year details focus with Tab
-    let details_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab),
-        TuiTestFixture::key_event(KeyCode::Tab),
-    ]);
-    assert_snapshot!("focus_year_details", details_output);
-
-    // Cycle back to file focus with Tab
-    let back_to_files = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab),
-        TuiTestFixture::key_event(KeyCode::Tab),
-        TuiTestFixture::key_event(KeyCode::Tab),
-    ]);
-    assert_snapshot!("focus_back_to_files", back_to_files);
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ income.csv ───────────────┐┌ 2025 ────────────────────┐"
+    "║ expenses.csv              ║│ 2024             6 000.00 ││▎2025-01-01      2 000.00 │"
+    "║▌income.csv       8 000.00 ║│▎2025             2 000.00 ││                          │"
+    "║ savings.csv               ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "╚═══════════════════════════╝└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
-fn test_year_navigation_with_keys() {
+fn test_focus_on_years() {
     let fixture = TuiTestFixture::new();
 
-    // Switch to years focus and navigate through years
-    let year_2024_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to years focus
-        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to previous year (2024)
-    ]);
-    assert_snapshot!("year_navigation_2024", year_2024_output);
-
-    let year_2025_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to years focus
-        TuiTestFixture::key_event(KeyCode::Char('k')), // Move to 2024
-        TuiTestFixture::key_event(KeyCode::Up),  // Move back to 2025
-    ]);
-    assert_snapshot!("year_navigation_2025", year_2025_output);
+    let output = fixture.run_with_events(vec![press_tab()]);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐╔ expenses.csv ═════════════╗┌ 2025 ────────────────────┐"
+    "│▎expenses.csv      -251.50 │║ 2024              -175.75 ║│▎2025-01-05        -75.75 │"
+    "│ income.csv                │║▌2025               -75.75 ║│                          │"
+    "│ savings.csv               │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "└───────────────────────────┘╚═══════════════════════════╝└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
-fn test_entry_navigation_with_keys() {
+fn test_focus_on_entries() {
     let fixture = TuiTestFixture::new();
 
-    // Switch to entry details focus and navigate through entries
-    let entry_1_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab),       // Years focus
-        TuiTestFixture::key_event(KeyCode::Tab),       // Year details focus
-        TuiTestFixture::key_event(KeyCode::Char('j')), // Move to next entry
-    ]);
-    assert_snapshot!("entry_navigation_1", entry_1_output);
+    let output = fixture.run_with_events(vec![repeat(press_tab(), 2)]);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐╔ 2025 ════════════════════╗"
+    "│▎expenses.csv      -251.50 ││ 2024              -175.75 │║▌2025-01-05        -75.75 ║"
+    "│ income.csv                ││▎2025               -75.75 │║                          ║"
+    "│ savings.csv               ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "└───────────────────────────┘└───────────────────────────┘╚══════════════════════════╝"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
+}
 
-    let entry_0_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab),       // Years focus
-        TuiTestFixture::key_event(KeyCode::Tab),       // Year details focus
-        TuiTestFixture::key_event(KeyCode::Down),      // Move to next entry
-        TuiTestFixture::key_event(KeyCode::Char('k')), // Move back to first entry
+#[test]
+fn test_cycle_back_focus_on_files() {
+    let fixture = TuiTestFixture::new();
+
+    let output = fixture.run_with_events(vec![repeat(press_tab(), 3)]);
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+    "║▌expenses.csv      -251.50 ║│ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+    "║ income.csv                ║│▎2025               -75.75 ││                          │"
+    "║ savings.csv               ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "╚═══════════════════════════╝└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
+}
+
+#[test]
+fn test_years_navigation() {
+    let fixture = TuiTestFixture::new();
+
+    let to_years = press_tab();
+    let to_first_year = press_up();
+    let output = fixture.run_with_events(vec![to_years, to_first_year]);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐╔ expenses.csv ═════════════╗┌ 2024 ────────────────────┐"
+    "│▎expenses.csv      -251.50 │║▌2024              -175.75 ║│▎2024-01-15        -50.25 │"
+    "│ income.csv                │║ 2025               -75.75 ║│ 2024-02-20       -100.00 │"
+    "│ savings.csv               │║                           ║│ 2024-03-10        -25.50 │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "│                           │║                           ║│                          │"
+    "└───────────────────────────┘╚═══════════════════════════╝└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
+}
+
+#[test]
+fn test_entries_navigation() {
+    let fixture = TuiTestFixture::new();
+
+    let to_years = press_tab();
+    let to_entries = press_tab();
+    let cycle_to_first_year = press_down();
+    let to_last_line = repeat(press_down(), 2);
+    let output = fixture.run_with_events(vec![
+        to_years,
+        cycle_to_first_year,
+        to_entries,
+        to_last_line,
     ]);
-    assert_snapshot!("entry_navigation_0", entry_0_output);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐╔ 2024 ════════════════════╗"
+    "│▎expenses.csv      -251.50 ││▎2024              -175.75 │║ 2024-01-15        -50.25 ║"
+    "│ income.csv                ││ 2025               -75.75 │║ 2024-02-20       -100.00 ║"
+    "│ savings.csv               ││                           │║▌2024-03-10        -25.50 ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "│                           ││                           │║                          ║"
+    "└───────────────────────────┘└───────────────────────────┘╚══════════════════════════╝"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
 fn test_add_entry_popup_open() {
     let fixture = TuiTestFixture::new();
 
-    // Test opening add entry popup with 'a' key
-    let add_popup_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-    ]);
+    let output = fixture.run_with_events(vec![press_add_entry()]);
 
     let mut settings = insta::Settings::clone_current();
-
     let current_date = chrono::Local::now().date_naive().to_string();
     settings.add_filter(&current_date, "0000-00-00");
     settings.bind(|| {
-        assert_snapshot!("add_entry_popup", add_popup_output);
+        assert_snapshot!(output, @r#"
+        "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+        "│▎expenses.csv      -251.50 ││ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+        "│ income.csv                ││▎2025               -75.75 ││                          │"
+        "│ savings.csv               ││                           ││                          │"
+        "│                           ││                           ││                          │"
+        "│                           ││                           ││                          │"
+        "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
+        "│                ║ File    expenses.csv                             ║                │"
+        "│                ║                                                  ║                │"
+        "│                ║▌Date    0000-00-00                               ║                │"
+        "│                ║ Amount                                           ║                │"
+        "│                ║                                                  ║                │"
+        "│                ║                                                  ║                │"
+        "│                ╚══════════════════════════════════════════════════╝                │"
+        "│                           ││                           ││                          │"
+        "│                           ││                           ││                          │"
+        "└───────────────────────────┘└───────────────────────────┘└──────────────────────────┘"
+        "┌────────────────────────────────────────────────────────────────────────────────────┐"
+        "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
+        "└────────────────────────────────────────────────────────────────────────────────────┘"
+        "#);
     });
 }
 
@@ -194,45 +393,104 @@ fn test_add_entry_popup_open() {
 fn test_edit_entry_popup_open() {
     let fixture = TuiTestFixture::new();
 
-    // Test opening edit entry popup with 'e' key
-    let edit_popup_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Tab),       // Years focus
-        TuiTestFixture::key_event(KeyCode::Tab),       // Year details focus
-        TuiTestFixture::key_event(KeyCode::Char('e')), // Open edit entry popup
-    ]);
-    assert_snapshot!("edit_entry_popup", edit_popup_output);
+    let to_second_file = press_down();
+    let to_entries = repeat(press_tab(), 2);
+    let output = fixture.run_with_events(vec![to_second_file, to_entries, press_edit_entry()]);
+
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ income.csv ───────────────┐┌ 2025 ────────────────────┐"
+    "│ expenses.csv              ││ 2024             6 000.00 ││▎2025-01-01      2 000.00 │"
+    "│▎income.csv       8 000.00 ││▎2025             2 000.00 ││                          │"
+    "│ savings.csv               ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                ╔ Edit Entry ══════════════════════════════════════╗                │"
+    "│                ║ File    income.csv                               ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║▌Date    2025-01-01                               ║                │"
+    "│                ║ Amount  2000                                     ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║                                                  ║                │"
+    "│                ╚══════════════════════════════════════════════════╝                │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "└───────────────────────────┘└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
 fn test_popup_input_and_focus() {
     let fixture = TuiTestFixture::new();
 
-    // Test popup input and focus switching
-    let popup_input_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-        TuiTestFixture::key_event(KeyCode::Backspace), // Delete some of default date
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Char('1')), // Change date
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to amount field
-        TuiTestFixture::key_event(KeyCode::Char('1')), // Enter amount
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Char('0')),
+    let delete_day_date = repeat(press_backspace(), 2);
+    let change_day_date = type_text("10");
+    let switch_to_amount_field = press_tab();
+    let delete_old_amount = repeat(press_backspace(), 10);
+    let enter_new_amount = type_text("100");
+    let output = fixture.run_with_events(vec![
+        press_edit_entry(),
+        delete_day_date,
+        change_day_date,
+        switch_to_amount_field,
+        delete_old_amount,
+        enter_new_amount,
     ]);
-    assert_snapshot!("popup_input_focus", popup_input_output);
+
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+    "│▎expenses.csv      -251.50 ││ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+    "│ income.csv                ││▎2025               -75.75 ││                          │"
+    "│ savings.csv               ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                ╔ Edit Entry ══════════════════════════════════════╗                │"
+    "│                ║ File    expenses.csv                             ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║ Date    2025-01-10                               ║                │"
+    "│                ║▌Amount  100                                      ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║                                                  ║                │"
+    "│                ╚══════════════════════════════════════════════════╝                │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "└───────────────────────────┘└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
-fn test_popup_close_with_q() {
+fn test_popup_close() {
     let fixture = TuiTestFixture::new();
 
-    // Test closing popup with 'q' key
-    let popup_close_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-        TuiTestFixture::key_event(KeyCode::Char('q')), // Close popup
-    ]);
-    assert_snapshot!("popup_close", popup_close_output);
+    let output = fixture.run_with_events(vec![press_add_entry(), press_close_popup()]);
+
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+    "║▌expenses.csv      -251.50 ║│ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+    "║ income.csv                ║│▎2025               -75.75 ││                          │"
+    "║ savings.csv               ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "║                           ║│                           ││                          │"
+    "╚═══════════════════════════╝└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit                    │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
@@ -243,34 +501,18 @@ fn test_add_entry_save_functionality() {
     let file_path = &fixture.files[0];
     let initial_content = std::fs::read_to_string(file_path).unwrap();
 
-    // Test adding an entry with valid input (this should save and close popup)
+    let delete_old_date = repeat(press_backspace(), 10);
+    let enter_new_date = type_text("2024-12-15");
+    let switch_to_amount_field = press_tab();
+    let enter_amount = type_text("500");
+    let save_and_close_popup = press_enter();
     let _output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-        TuiTestFixture::key_event(KeyCode::Backspace), // Clear current date
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Char('2')), // Enter new date
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Char('2')),
-        TuiTestFixture::key_event(KeyCode::Char('4')),
-        TuiTestFixture::key_event(KeyCode::Char('-')),
-        TuiTestFixture::key_event(KeyCode::Char('1')),
-        TuiTestFixture::key_event(KeyCode::Char('2')),
-        TuiTestFixture::key_event(KeyCode::Char('-')),
-        TuiTestFixture::key_event(KeyCode::Char('1')),
-        TuiTestFixture::key_event(KeyCode::Char('5')),
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to amount field
-        TuiTestFixture::key_event(KeyCode::Char('5')), // Enter amount
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Enter), // Save entry
+        press_add_entry(),
+        delete_old_date,
+        enter_new_date,
+        switch_to_amount_field,
+        enter_amount,
+        save_and_close_popup,
     ]);
 
     // Check that the CSV file was updated
@@ -290,62 +532,84 @@ fn test_add_entry_save_functionality() {
 fn test_popup_error_handling() {
     let fixture = TuiTestFixture::new();
 
-    // Test error message display with invalid date
-    let invalid_date_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-        TuiTestFixture::key_event(KeyCode::Backspace), // Clear current date
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Char('i')), // Enter invalid date
-        TuiTestFixture::key_event(KeyCode::Char('n')),
-        TuiTestFixture::key_event(KeyCode::Char('v')),
-        TuiTestFixture::key_event(KeyCode::Char('a')),
-        TuiTestFixture::key_event(KeyCode::Char('l')),
-        TuiTestFixture::key_event(KeyCode::Char('i')),
-        TuiTestFixture::key_event(KeyCode::Char('d')),
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to amount field
-        TuiTestFixture::key_event(KeyCode::Char('1')), // Enter valid amount
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Enter), // Try to save (should show error)
+    let delete_old_date = repeat(press_backspace(), 10);
+    let enter_invalid_date = type_text("invalid");
+    let switch_to_amount_field = press_tab();
+    let enter_valid_amount = type_text("500");
+    let try_to_save = press_enter();
+    let output = fixture.run_with_events(vec![
+        press_add_entry(),
+        delete_old_date,
+        enter_invalid_date,
+        switch_to_amount_field,
+        enter_valid_amount,
+        try_to_save,
     ]);
 
-    assert_snapshot!("popup_error_invalid_date", invalid_date_output);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+    "│▎expenses.csv      -251.50 ││ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+    "│ income.csv                ││▎2025               -75.75 ││                          │"
+    "│ savings.csv               ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
+    "│                ║ File    expenses.csv                             ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║ Date    invalid                                  ║                │"
+    "│                ║▌Amount  500                                      ║                │"
+    "│                ║ Error: Invalid date format. Use YYYY-MM-DD       ║                │"
+    "│                ║                                                  ║                │"
+    "│                ╚══════════════════════════════════════════════════╝                │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "└───────────────────────────┘└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
 
 #[test]
 fn test_popup_error_clearing() {
     let fixture = TuiTestFixture::new();
 
-    // Test that error message is cleared when user starts typing
-    let error_cleared_output = fixture.run_with_events(vec![
-        TuiTestFixture::key_event(KeyCode::Char('a')), // Open add entry popup
-        TuiTestFixture::key_event(KeyCode::Backspace), // Clear current date
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Backspace),
-        TuiTestFixture::key_event(KeyCode::Char('b')), // Enter invalid date
-        TuiTestFixture::key_event(KeyCode::Char('a')),
-        TuiTestFixture::key_event(KeyCode::Char('d')),
-        TuiTestFixture::key_event(KeyCode::Tab), // Switch to amount field
-        TuiTestFixture::key_event(KeyCode::Char('1')), // Enter valid amount
-        TuiTestFixture::key_event(KeyCode::Char('0')),
-        TuiTestFixture::key_event(KeyCode::Enter), // Try to save (should show error)
-        TuiTestFixture::key_event(KeyCode::Char('2')), // Start typing to clear error
+    let delete_old_date = repeat(press_backspace(), 10);
+    let enter_invalid_date = type_text("bad");
+    let switch_to_amount_field = press_tab();
+    let enter_valid_amount = type_text("10");
+    let try_to_save = press_enter();
+    let start_typing_to_clear_error = type_text("2");
+    let output = fixture.run_with_events(vec![
+        press_add_entry(),
+        delete_old_date,
+        enter_invalid_date,
+        switch_to_amount_field,
+        enter_valid_amount,
+        try_to_save,
+        start_typing_to_clear_error,
     ]);
 
-    assert_snapshot!("popup_error_cleared", error_cleared_output);
+    assert_snapshot!(output, @r#"
+    "┌ Files ────────────────────┐┌ expenses.csv ─────────────┐┌ 2025 ────────────────────┐"
+    "│▎expenses.csv      -251.50 ││ 2024              -175.75 ││▎2025-01-05        -75.75 │"
+    "│ income.csv                ││▎2025               -75.75 ││                          │"
+    "│ savings.csv               ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
+    "│                ║ File    expenses.csv                             ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║ Date    bad                                      ║                │"
+    "│                ║▌Amount  102                                      ║                │"
+    "│                ║                                                  ║                │"
+    "│                ║                                                  ║                │"
+    "│                ╚══════════════════════════════════════════════════╝                │"
+    "│                           ││                           ││                          │"
+    "│                           ││                           ││                          │"
+    "└───────────────────────────┘└───────────────────────────┘└──────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
 }
