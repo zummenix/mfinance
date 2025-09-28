@@ -378,7 +378,7 @@ impl App {
     }
 
     fn close_popup(&mut self) {
-        self.popup = Popup::new()
+        self.popup = Popup::new();
     }
 
     fn get_selected_entry(&self) -> Option<&Entry> {
