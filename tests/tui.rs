@@ -121,11 +121,9 @@ fn type_text(s: &str) -> Vec<Event> {
 }
 
 fn repeat(events: Vec<Event>, n_times: usize) -> Vec<Event> {
-    let mut result: Vec<Event> = vec![];
+    let mut result: Vec<Event> = Vec::with_capacity(events.len() * n_times);
     for _ in 0..n_times {
-        for event in events.iter() {
-            result.push(event.clone());
-        }
+        result.extend(events.iter().cloned());
     }
     result
 }
