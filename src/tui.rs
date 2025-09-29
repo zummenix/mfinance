@@ -549,11 +549,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     let content_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(34),
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-        ])
+        .constraints([Constraint::Ratio(1, 3); 3])
         .split(main_layout[0]);
 
     let files_width = content_layout[0].width.saturating_sub(2) as usize; // Account for block borders
