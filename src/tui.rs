@@ -219,7 +219,7 @@ impl ReportViewModel {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
                     let lines: Vec<(String, String)> = entries
                         .iter()
-                        .map(|entry| (entry.date.clone(), entry.amount.format(format_options)))
+                        .map(|entry| (entry.day_month_date(), entry.amount.format(format_options)))
                         .collect();
                     YearReportViewModel {
                         title: year,

@@ -6,7 +6,7 @@ Buffer {
     area: Rect { x: 0, y: 0, width: 86, height: 20 },
     content: [
         "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐",
-        "║▌expenses.csv      -251.50 ║│ 2024             -175.75 ││▎2025-01-05         -75.75 │",
+        "║▌expenses.csv      -251.50 ║│ 2024             -175.75 ││▎January 5          -75.75 │",
         "║ income.csv                ║│▎2025              -75.75 ││                           │",
         "║ savings.csv               ║│                          ││                           │",
         "║                           ║│                          ││                           │",
