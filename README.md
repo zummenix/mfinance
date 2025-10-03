@@ -1,6 +1,6 @@
 # mfinance
 
-A minimalist command-line tool for personal finance tracking using CSV files.
+A minimalist command-line tool for personal finance tracking based on CSV files.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -9,7 +9,8 @@ A minimalist command-line tool for personal finance tracking using CSV files.
 - Simple date-based transaction tracking (YYYY-MM-DD)
 - Add income/expenses with positive/negative amounts
 - Generate filtered financial reports (year/month)
-- Automatic CSV file sorting by date
+- Sort CSV file by date
+- Interactive terminal user interface
 - Human-readable currency formatting with thousands separators
 
 ## Installation
@@ -28,7 +29,7 @@ mfinance --version
 ### Basic workflow
 
 ```bash
-# Add new entry (negative amount = expense)
+# Add new entry (negative amounts are supported)
 mfinance new-entry --amount -199.99 --date 2024-09-15 finances.csv
 
 # Generate full report
@@ -39,6 +40,9 @@ mfinance report --filter 2024-09 finances.csv
 
 # Sort CSV file by date
 mfinance sort finances.csv
+
+# Open a simple terminal user interface with a list of files
+mfinance tui path/to/dir
 ```
 
 ### CSV Format Example
