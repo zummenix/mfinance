@@ -1,6 +1,7 @@
 pub mod number_formatter;
 pub mod tui;
 
+use chrono::NaiveDate;
 use csv::ReaderBuilder;
 use rust_decimal::Decimal;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,16 @@ pub const DELIMITER: u8 = b';';
 pub struct Entry {
     pub date: String,
     pub amount: Decimal,
+}
+
+impl Entry {
+    pub fn day_month_date(&self) -> String {
+        if let Ok(date) = self.date.parse::<NaiveDate>() {
+            date.format("%B %-d").to_string()
+        } else {
+            self.date.clone()
+        }
+    }
 }
 
 #[derive(Debug, Error)]
