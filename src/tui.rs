@@ -4,12 +4,12 @@ use crate::{
 };
 use chrono::Datelike;
 use chrono::NaiveDate;
-use crossterm::{
+use csv::WriterBuilder;
+use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use csv::WriterBuilder;
 use ratatui::{
     Terminal,
     layout::Position as CursorPosition,
@@ -396,7 +396,7 @@ impl App {
         };
     }
 
-    fn handle_popup_input(&mut self, key_event: crossterm::event::KeyEvent) {
+    fn handle_popup_input(&mut self, key_event: ratatui::crossterm::event::KeyEvent) {
         // Clear error message when user starts typing
         if matches!(key_event.code, KeyCode::Char(_) | KeyCode::Backspace) {
             self.popup.error_message = None;
