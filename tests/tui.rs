@@ -1,6 +1,6 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use insta::assert_snapshot;
 use mfinance::{number_formatter::FormatOptions, tui::run_tui_loop};
+use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{Terminal, backend::TestBackend};
 use std::{fs, path::PathBuf};
 use temp_dir::TempDir;
@@ -78,9 +78,9 @@ impl TuiTestFixture {
 fn key_event(code: KeyCode) -> Event {
     Event::Key(KeyEvent {
         code,
-        modifiers: crossterm::event::KeyModifiers::empty(),
+        modifiers: ratatui::crossterm::event::KeyModifiers::empty(),
         kind: KeyEventKind::Press,
-        state: crossterm::event::KeyEventState::empty(),
+        state: ratatui::crossterm::event::KeyEventState::empty(),
     })
 }
 
