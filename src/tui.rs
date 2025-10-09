@@ -131,7 +131,7 @@ pub fn run_tui(
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Focus {
-    FileSelection,
+    Files,
     Years,
     YearDetails,
 }
@@ -239,7 +239,7 @@ impl App {
             files,
             format_options,
             selected_file: 0,
-            focus: Focus::FileSelection,
+            focus: Focus::Files,
             report: ReportViewModel::default(),
             selected_year: 0,
             selected_entry: 0,
@@ -251,9 +251,9 @@ impl App {
 
     fn cycle_focus(&mut self) {
         self.focus = match self.focus {
-            Focus::FileSelection => Focus::Years,
+            Focus::Files => Focus::Years,
             Focus::Years => Focus::YearDetails,
-            Focus::YearDetails => Focus::FileSelection,
+            Focus::YearDetails => Focus::Files,
         };
         // Reset selection when changing focus areas
         self.selected_entry = 0;
@@ -261,7 +261,7 @@ impl App {
 
     fn next(&mut self) {
         match self.focus {
-            Focus::FileSelection => {
+            Focus::Files => {
                 if self.selected_file + 1 >= self.files.len() {
                     self.selected_file = 0;
                 } else {
@@ -295,7 +295,7 @@ impl App {
 
     fn previous(&mut self) {
         match self.focus {
-            Focus::FileSelection => {
+            Focus::Files => {
                 if self.selected_file == 0 {
                     self.selected_file = self.files.len() - 1;
                 } else {
@@ -562,14 +562,14 @@ fn ui(frame: &mut Frame, app: &mut App) {
                 ""
             },
             i == app.selected_file,
-            app.focus == Focus::FileSelection && app.popup.mode == PopupMode::None,
+            app.focus == Focus::Files && app.popup.mode == PopupMode::None,
             files_width,
         ))
     });
 
     let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
     let files_list = List::new(files)
-        .block(app.create_block(Line::from(" Files "), Focus::FileSelection))
+        .block(app.create_block(Line::from(" Files "), Focus::Files))
         .highlight_style(highlight_style);
     frame.render_stateful_widget(files_list, content_layout[0], &mut ListState::default());
 
