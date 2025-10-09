@@ -131,7 +131,7 @@ pub fn run_tui(
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Focus {
-    FileSelection,
+    Files,
     Years,
     YearDetails,
 }
@@ -152,11 +152,9 @@ enum PopupFocus {
 struct App {
     files: Vec<PathBuf>,
     format_options: FormatOptions,
-    selected_file: usize,
     report: ReportViewModel,
+    selection: Selection,
     focus: Focus,
-    selected_year: usize,
-    selected_entry: usize,
     popup: Popup,
 }
 
@@ -178,6 +176,13 @@ impl Popup {
             error_message: None,
         }
     }
+}
+
+#[derive(Default)]
+struct Selection {
+    file: usize,
+    year: usize,
+    entry: usize,
 }
 
 #[derive(Default)]
@@ -238,11 +243,9 @@ impl App {
         let mut app = Self {
             files,
             format_options,
-            selected_file: 0,
-            focus: Focus::FileSelection,
+            focus: Focus::Files,
             report: ReportViewModel::default(),
-            selected_year: 0,
-            selected_entry: 0,
+            selection: Selection::default(),
             popup: Popup::new(),
         };
         app.select_file();
@@ -251,43 +254,43 @@ impl App {
 
     fn cycle_focus(&mut self) {
         self.focus = match self.focus {
-            Focus::FileSelection => Focus::Years,
+            Focus::Files => Focus::Years,
             Focus::Years => Focus::YearDetails,
-            Focus::YearDetails => Focus::FileSelection,
+            Focus::YearDetails => Focus::Files,
         };
         // Reset selection when changing focus areas
-        self.selected_entry = 0;
+        self.selection.entry = 0;
     }
 
     fn next(&mut self) {
         match self.focus {
-            Focus::FileSelection => {
-                if self.selected_file + 1 >= self.files.len() {
-                    self.selected_file = 0;
+            Focus::Files => {
+                if self.selection.file + 1 >= self.files.len() {
+                    self.selection.file = 0;
                 } else {
-                    self.selected_file += 1;
+                    self.selection.file += 1;
                 }
                 self.select_file();
             }
             Focus::Years => {
-                if self.selected_year + 1 >= self.report.year_reports.len() {
-                    self.selected_year = 0;
+                if self.selection.year + 1 >= self.report.year_reports.len() {
+                    self.selection.year = 0;
                 } else {
-                    self.selected_year += 1;
+                    self.selection.year += 1;
                 }
-                self.selected_entry = 0;
+                self.selection.entry = 0;
             }
             Focus::YearDetails => {
                 let entry_count = self
                     .report
                     .year_reports
-                    .get(self.selected_year)
+                    .get(self.selection.year)
                     .map(|yr| yr.lines.len())
                     .unwrap_or(0);
-                if self.selected_entry + 1 >= entry_count {
-                    self.selected_entry = 0;
+                if self.selection.entry + 1 >= entry_count {
+                    self.selection.entry = 0;
                 } else {
-                    self.selected_entry += 1;
+                    self.selection.entry += 1;
                 }
             }
         }
@@ -295,43 +298,43 @@ impl App {
 
     fn previous(&mut self) {
         match self.focus {
-            Focus::FileSelection => {
-                if self.selected_file == 0 {
-                    self.selected_file = self.files.len() - 1;
+            Focus::Files => {
+                if self.selection.file == 0 {
+                    self.selection.file = self.files.len() - 1;
                 } else {
-                    self.selected_file -= 1;
+                    self.selection.file -= 1;
                 }
                 self.select_file();
             }
             Focus::Years => {
-                if self.selected_year == 0 {
-                    self.selected_year = self.report.year_reports.len().saturating_sub(1);
+                if self.selection.year == 0 {
+                    self.selection.year = self.report.year_reports.len().saturating_sub(1);
                 } else {
-                    self.selected_year -= 1;
+                    self.selection.year -= 1;
                 }
-                self.selected_entry = 0;
+                self.selection.entry = 0;
             }
             Focus::YearDetails => {
                 let entry_count = self
                     .report
                     .year_reports
-                    .get(self.selected_year)
+                    .get(self.selection.year)
                     .map(|yr| yr.lines.len())
                     .unwrap_or(0);
-                if self.selected_entry == 0 {
-                    self.selected_entry = entry_count.saturating_sub(1);
+                if self.selection.entry == 0 {
+                    self.selection.entry = entry_count.saturating_sub(1);
                 } else {
-                    self.selected_entry -= 1;
+                    self.selection.entry -= 1;
                 }
             }
         }
     }
 
     fn select_file(&mut self) {
-        if let Some(path) = self.files.get(self.selected_file) {
+        if let Some(path) = self.files.get(self.selection.file) {
             match ReportViewModel::new(path, &self.format_options) {
                 Ok(report) => {
-                    self.selected_year = (report.year_reports.len() - 1).max(0);
+                    self.selection.year = report.year_reports.len().saturating_sub(1);
                     self.report = report;
                 }
                 Err(e) => eprintln!("Error loading file: {e}"),
@@ -384,9 +387,9 @@ impl App {
     fn get_selected_entry(&self) -> Option<&Entry> {
         self.report
             .year_reports
-            .get(self.selected_year)?
+            .get(self.selection.year)?
             .entries
-            .get(self.selected_entry)
+            .get(self.selection.entry)
     }
 
     fn cycle_popup_focus(&mut self) {
@@ -453,7 +456,7 @@ impl App {
             }
         };
 
-        let file_path = &self.files[self.selected_file];
+        let file_path = &self.files[self.selection.file];
 
         let result = match self.popup.mode {
             PopupMode::AddEntry => self.add_entry_to_file(file_path, date, amount),
@@ -556,20 +559,20 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let files = app.files.iter().enumerate().map(|(i, path)| {
         ListItem::new(make_line(
             path.file_name().unwrap().to_string_lossy(),
-            if i == app.selected_file {
+            if i == app.selection.file {
                 &app.report.total
             } else {
                 ""
             },
-            i == app.selected_file,
-            app.focus == Focus::FileSelection && app.popup.mode == PopupMode::None,
+            i == app.selection.file,
+            app.focus == Focus::Files && app.popup.mode == PopupMode::None,
             files_width,
         ))
     });
 
     let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
     let files_list = List::new(files)
-        .block(app.create_block(Line::from(" Files "), Focus::FileSelection))
+        .block(app.create_block(Line::from(" Files "), Focus::Files))
         .highlight_style(highlight_style);
     frame.render_stateful_widget(files_list, content_layout[0], &mut ListState::default());
 
@@ -579,7 +582,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
         ListItem::new(make_line(
             &year.title,
             &year.subtotal_amount,
-            i == app.selected_year,
+            i == app.selection.year,
             app.focus == Focus::Years && app.popup.mode == PopupMode::None,
             years_width,
         ))
@@ -591,13 +594,13 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     // Entries list (right column)
     let entries_width = content_layout[2].width.saturating_sub(2) as usize; // Account for block borders
-    let selected_year = &app.report.year_reports[app.selected_year];
+    let selected_year = &app.report.year_reports[app.selection.year];
     let entries_list = List::new(selected_year.lines.iter().enumerate().map(
         |(i, (date, amount))| {
             ListItem::new(make_line(
                 date,
                 amount,
-                i == app.selected_entry,
+                i == app.selection.entry,
                 app.focus == Focus::YearDetails && app.popup.mode == PopupMode::None,
                 entries_width,
             ))
@@ -679,7 +682,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
         .split(inner_area);
 
     // File name
-    let file_name = app.files[app.selected_file]
+    let file_name = app.files[app.selection.file]
         .file_name()
         .unwrap()
         .to_string_lossy();
