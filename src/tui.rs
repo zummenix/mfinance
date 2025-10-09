@@ -334,7 +334,7 @@ impl App {
         if let Some(path) = self.files.get(self.selection.file) {
             match ReportViewModel::new(path, &self.format_options) {
                 Ok(report) => {
-                    self.selection.year = (report.year_reports.len() - 1).max(0);
+                    self.selection.year = report.year_reports.len().saturating_sub(1);
                     self.report = report;
                 }
                 Err(e) => eprintln!("Error loading file: {e}"),
