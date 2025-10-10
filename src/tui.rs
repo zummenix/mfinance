@@ -545,17 +545,17 @@ impl App {
 }
 
 fn ui(frame: &mut Frame, app: &mut App) {
-    let main_layout = Layout::default()
+    let [main_rect, help_rect] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(3), Constraint::Length(3)])
-        .split(frame.area());
+        .areas(frame.area());
 
-    let content_layout = Layout::default()
+    let [files_rect, years_rect, entries_rect] = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Ratio(1, 3); 3])
-        .split(main_layout[0]);
+        .areas(main_rect);
 
-    let files_width = content_layout[0].width.saturating_sub(2) as usize; // Account for block borders
+    let files_width = files_rect.width.saturating_sub(2) as usize; // Account for block borders
     let files = app.files.iter().enumerate().map(|(i, path)| {
         ListItem::new(make_line(
             path.file_name().unwrap().to_string_lossy(),
@@ -574,10 +574,10 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let files_list = List::new(files)
         .block(app.create_block(Line::from(" Files "), Focus::Files))
         .highlight_style(highlight_style);
-    frame.render_stateful_widget(files_list, content_layout[0], &mut ListState::default());
+    frame.render_stateful_widget(files_list, files_rect, &mut ListState::default());
 
     // Years list (middle column)
-    let years_width = content_layout[1].width.saturating_sub(2) as usize; // Account for block borders
+    let years_width = years_rect.width.saturating_sub(2) as usize; // Account for block borders
     let years_list = List::new(app.report.year_reports.iter().enumerate().map(|(i, year)| {
         ListItem::new(make_line(
             &year.title,
@@ -590,10 +590,10 @@ fn ui(frame: &mut Frame, app: &mut App) {
     .block(app.create_block(Line::from(format!(" {} ", app.report.title)), Focus::Years))
     .highlight_style(highlight_style);
 
-    frame.render_stateful_widget(years_list, content_layout[1], &mut ListState::default());
+    frame.render_stateful_widget(years_list, years_rect, &mut ListState::default());
 
     // Entries list (right column)
-    let entries_width = content_layout[2].width.saturating_sub(2) as usize; // Account for block borders
+    let entries_width = entries_rect.width.saturating_sub(2) as usize; // Account for block borders
     let selected_year = &app.report.year_reports[app.selection.year];
     let entries_list = List::new(selected_year.lines.iter().enumerate().map(
         |(i, (date, amount))| {
@@ -612,7 +612,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     ))
     .highlight_style(highlight_style);
 
-    frame.render_stateful_widget(entries_list, content_layout[2], &mut ListState::default());
+    frame.render_stateful_widget(entries_list, entries_rect, &mut ListState::default());
 
     let footer_text = if app.popup.mode == PopupMode::None {
         "↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit"
@@ -620,7 +620,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
         "Tab: Switch Field | Enter: Save | q: Cancel"
     };
     let footer = Paragraph::new(footer_text).block(Block::default().borders(Borders::ALL));
-    frame.render_widget(footer, main_layout[1]);
+    frame.render_widget(footer, help_rect);
 
     // Render popup if active
     if app.popup.mode != PopupMode::None {
@@ -631,28 +631,28 @@ fn ui(frame: &mut Frame, app: &mut App) {
 fn render_popup(frame: &mut Frame, app: &App) {
     // Create a centered popup area
     let area = frame.area();
-    let popup_area = Layout::default()
+    let [_, popup_rect, _] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(30),
             Constraint::Min(8),
             Constraint::Percentage(30),
         ])
-        .split(area)[1];
+        .areas(area);
 
-    let popup_area = Layout::default()
+    let [_, popup_rect, _] = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage(20),
             Constraint::Min(40),
             Constraint::Percentage(20),
         ])
-        .split(popup_area)[1];
+        .areas(popup_rect);
 
     // Clear the area
     let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    frame.render_widget(Clear, popup_area);
-    frame.render_widget(clear_block, popup_area);
+    frame.render_widget(Clear, popup_rect);
+    frame.render_widget(clear_block, popup_rect);
 
     // Create the popup content
     let title = match app.popup.mode {
@@ -667,9 +667,9 @@ fn render_popup(frame: &mut Frame, app: &App) {
         .border_type(BorderType::Double)
         .style(Style::default().bg(Color::Black).fg(Color::White));
 
-    let inner_area = popup_block.inner(popup_area);
-    frame.render_widget(popup_block, popup_area);
-    let content_layout = Layout::default()
+    let inner_area = popup_block.inner(popup_rect);
+    frame.render_widget(popup_block, popup_rect);
+    let [file_name_rect, _, date_rect, amount_rect, error_rect, _] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // File name
@@ -679,7 +679,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(1), // Empty line or error message
             Constraint::Min(1),    // Remaining space
         ])
-        .split(inner_area);
+        .areas(inner_area);
 
     // File name
     let file_name = app.files[app.selection.file]
@@ -687,14 +687,14 @@ fn render_popup(frame: &mut Frame, app: &App) {
         .unwrap()
         .to_string_lossy();
     let file_name_input = Input::new(file_name.into_owned());
-    render_input_field(frame, "File  ", &file_name_input, content_layout[0], false);
+    render_input_field(frame, "File  ", &file_name_input, file_name_rect, false);
 
     // Date field
     render_input_field(
         frame,
         "Date  ",
         &app.popup.date_input,
-        content_layout[2],
+        date_rect,
         app.popup.focus == PopupFocus::Date,
     );
 
@@ -703,7 +703,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
         frame,
         "Amount",
         &app.popup.amount_input,
-        content_layout[3],
+        amount_rect,
         app.popup.focus == PopupFocus::Amount,
     );
 
@@ -714,7 +714,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
             Span::raw("Error: ").style(Style::default().fg(Color::Red)),
             Span::raw(error_msg).style(Style::default().fg(Color::Red)),
         ]);
-        frame.render_widget(Paragraph::new(error_line), content_layout[4]);
+        frame.render_widget(Paragraph::new(error_line), error_rect);
     }
 }
 
