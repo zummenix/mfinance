@@ -1,3 +1,4 @@
+use crate::add_entry;
 use crate::{
     DELIMITER, Entry, entries_from_file,
     number_formatter::{FormatOptions, NumberFormatter},
@@ -459,7 +460,9 @@ impl App {
         let file_path = &self.files[self.selection.file];
 
         let result = match self.popup.mode {
-            PopupMode::AddEntry => self.add_entry_to_file(file_path, date, amount),
+            PopupMode::AddEntry => add_entry(file_path, date, amount)
+                .map(|_| ())
+                .map_err(|err| err.into()),
             PopupMode::EditEntry => self.edit_entry_in_file(file_path, date, amount),
             PopupMode::None => Ok(()),
         };
@@ -475,36 +478,6 @@ impl App {
                 self.popup.error_message = Some(format!("Failed to save: {}", e));
             }
         }
-    }
-
-    fn add_entry_to_file(
-        &self,
-        file_path: &Path,
-        date: NaiveDate,
-        amount: Decimal,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let entries = entries_from_file(file_path).unwrap_or_default();
-
-        let new_entry = Entry {
-            date: date.to_string(),
-            amount,
-        };
-
-        // Write to the end of the file
-        let mut writer = WriterBuilder::new()
-            .delimiter(DELIMITER)
-            .has_headers(entries.is_empty())
-            .from_writer(
-                OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(file_path)?,
-            );
-
-        writer.serialize(new_entry)?;
-        writer.flush()?;
-
-        Ok(())
     }
 
     fn edit_entry_in_file(
