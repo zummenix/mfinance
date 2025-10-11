@@ -169,7 +169,7 @@ pub fn generate_report_for_all(file_path: &Path) -> Result<Report, AppError> {
 
 pub struct Report {
     filter: Option<String>,
-    entries: Vec<Entry>,
+    pub entries: Vec<Entry>,
 }
 
 impl Report {
