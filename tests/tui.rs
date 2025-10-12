@@ -146,8 +146,8 @@ fn test_down_or_j() {
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ savings.csv ─────────────┐┌ 2024 ─────────────────────┐"
-    "║ expenses.csv              ║│▎2024            1 500.00 ││▎June 15            500.00 │"
-    "║ income.csv                ║│                          ││ December 31      1 000.00 │"
+    "║ expenses.csv              ║│▎2024            1 500.00 ││ June 15            500.00 │"
+    "║ income.csv                ║│                          ││▎December 31      1 000.00 │"
     "║▌savings.csv      1 500.00 ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -294,9 +294,9 @@ fn test_years_navigation() {
     let output = fixture.run_with_events(vec![to_years, to_first_year]);
     assert_snapshot!(output, @r#"
     "┌ Files ────────────────────┐╔ expenses.csv ════════════╗┌ 2024 ─────────────────────┐"
-    "│▎expenses.csv      -251.50 │║▌2024             -175.75 ║│▎January 15         -50.25 │"
+    "│▎expenses.csv      -251.50 │║▌2024             -175.75 ║│ January 15         -50.25 │"
     "│ income.csv                │║ 2025              -75.75 ║│ February 20       -100.00 │"
-    "│ savings.csv               │║                          ║│ March 10           -25.50 │"
+    "│ savings.csv               │║                          ║│▎March 10           -25.50 │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
@@ -323,18 +323,18 @@ fn test_entries_navigation() {
     let to_years = press_tab();
     let to_entries = press_tab();
     let cycle_to_first_year = press_down();
-    let to_last_line = repeat(press_down(), 2);
+    let to_first_line = repeat(press_up(), 2);
     let output = fixture.run_with_events(vec![
         to_years,
         cycle_to_first_year,
         to_entries,
-        to_last_line,
+        to_first_line,
     ]);
     assert_snapshot!(output, @r#"
     "┌ Files ────────────────────┐┌ expenses.csv ────────────┐╔ 2024 ═════════════════════╗"
-    "│▎expenses.csv      -251.50 ││▎2024             -175.75 │║ January 15         -50.25 ║"
+    "│▎expenses.csv      -251.50 ││▎2024             -175.75 │║▌January 15         -50.25 ║"
     "│ income.csv                ││ 2025              -75.75 │║ February 20       -100.00 ║"
-    "│ savings.csv               ││                          │║▌March 10           -25.50 ║"
+    "│ savings.csv               ││                          │║ March 10           -25.50 ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
