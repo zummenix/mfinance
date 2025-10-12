@@ -335,22 +335,6 @@ impl App {
             .unwrap_or(0)
     }
 
-    fn create_block<'a>(&self, title: Line<'a>, focus_area: Focus) -> Block<'a> {
-        let is_focused = self.focus == focus_area && self.popup.mode == PopupMode::None;
-        Block::default()
-            .title(title.add_modifier(if is_focused {
-                Modifier::BOLD
-            } else {
-                Modifier::empty()
-            }))
-            .borders(Borders::ALL)
-            .border_type(if is_focused {
-                BorderType::Double
-            } else {
-                BorderType::Plain
-            })
-    }
-
     fn open_add_entry_popup(&mut self) {
         self.popup.mode = PopupMode::AddEntry;
         self.popup.focus = PopupFocus::Date;
@@ -535,9 +519,11 @@ fn ui(frame: &mut Frame, app: &mut App) {
         ))
     });
 
+    let has_focus = |focus| app.focus == focus && app.popup.mode == PopupMode::None;
+
     let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
     let files_list = List::new(files)
-        .block(app.create_block(Line::from(" Files "), Focus::Files))
+        .block(make_block("Files", has_focus(Focus::Files)))
         .highlight_style(highlight_style);
     frame.render_stateful_widget(files_list, files_rect, &mut ListState::default());
 
@@ -552,7 +538,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
             years_width,
         ))
     }))
-    .block(app.create_block(Line::from(format!(" {} ", app.report.title)), Focus::Years))
+    .block(make_block(&app.report.title, has_focus(Focus::Years)))
     .highlight_style(highlight_style);
 
     frame.render_stateful_widget(years_list, years_rect, &mut ListState::default());
@@ -571,9 +557,9 @@ fn ui(frame: &mut Frame, app: &mut App) {
             ))
         },
     ))
-    .block(app.create_block(
-        Line::from(format!(" {} ", selected_year.title)),
-        Focus::YearDetails,
+    .block(make_block(
+        &selected_year.title,
+        has_focus(Focus::YearDetails),
     ))
     .highlight_style(highlight_style);
 
@@ -715,6 +701,22 @@ fn render_input_field(
             y: layout.y,
         });
     }
+}
+
+fn make_block(title: &str, is_focused: bool) -> Block<'_> {
+    let line = Line::raw(format!(" {title} "));
+    Block::default()
+        .title(line.add_modifier(if is_focused {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        }))
+        .borders(Borders::ALL)
+        .border_type(if is_focused {
+            BorderType::Double
+        } else {
+            BorderType::Plain
+        })
 }
 
 fn make_line<'a>(
