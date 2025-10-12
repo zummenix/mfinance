@@ -249,7 +249,9 @@ impl App {
             selection: Selection::default(),
             popup: Popup::new(),
         };
-        app.select_file();
+        app.reload_file();
+        app.select_last_year();
+        app.select_last_entry();
         app
     }
 
@@ -259,40 +261,24 @@ impl App {
             Focus::Years => Focus::YearDetails,
             Focus::YearDetails => Focus::Files,
         };
-        // Reset selection when changing focus areas
-        self.selection.entry = 0;
     }
 
     fn next(&mut self) {
         match self.focus {
             Focus::Files => {
-                if self.selection.file + 1 >= self.files.len() {
-                    self.selection.file = 0;
-                } else {
-                    self.selection.file += 1;
-                }
-                self.select_file();
+                self.selection.file = next_index_cycled(self.selection.file, self.files.len());
+                self.reload_file();
+                self.select_last_year();
+                self.select_last_entry();
             }
             Focus::Years => {
-                if self.selection.year + 1 >= self.report.year_reports.len() {
-                    self.selection.year = 0;
-                } else {
-                    self.selection.year += 1;
-                }
-                self.selection.entry = 0;
+                self.selection.year =
+                    next_index_cycled(self.selection.year, self.report.year_reports.len());
+                self.select_last_entry();
             }
             Focus::YearDetails => {
-                let entry_count = self
-                    .report
-                    .year_reports
-                    .get(self.selection.year)
-                    .map(|yr| yr.lines.len())
-                    .unwrap_or(0);
-                if self.selection.entry + 1 >= entry_count {
-                    self.selection.entry = 0;
-                } else {
-                    self.selection.entry += 1;
-                }
+                self.selection.entry =
+                    next_index_cycled(self.selection.entry, self.year_entries_count());
             }
         }
     }
@@ -300,47 +286,53 @@ impl App {
     fn previous(&mut self) {
         match self.focus {
             Focus::Files => {
-                if self.selection.file == 0 {
-                    self.selection.file = self.files.len() - 1;
-                } else {
-                    self.selection.file -= 1;
-                }
-                self.select_file();
+                self.selection.file = previous_index_cycled(self.selection.file, self.files.len());
+                self.reload_file();
+                self.select_last_year();
+                self.select_last_entry();
             }
             Focus::Years => {
-                if self.selection.year == 0 {
-                    self.selection.year = self.report.year_reports.len().saturating_sub(1);
-                } else {
-                    self.selection.year -= 1;
-                }
-                self.selection.entry = 0;
+                self.selection.year =
+                    previous_index_cycled(self.selection.year, self.report.year_reports.len());
+                self.select_last_entry();
             }
             Focus::YearDetails => {
-                let entry_count = self
-                    .report
-                    .year_reports
-                    .get(self.selection.year)
-                    .map(|yr| yr.lines.len())
-                    .unwrap_or(0);
-                if self.selection.entry == 0 {
-                    self.selection.entry = entry_count.saturating_sub(1);
-                } else {
-                    self.selection.entry -= 1;
-                }
+                self.selection.entry =
+                    previous_index_cycled(self.selection.entry, self.year_entries_count());
             }
         }
     }
 
-    fn select_file(&mut self) {
+    fn reload_file(&mut self) {
         if let Some(path) = self.files.get(self.selection.file) {
             match ReportViewModel::new(path, &self.format_options) {
                 Ok(report) => {
-                    self.selection.year = report.year_reports.len().saturating_sub(1);
                     self.report = report;
                 }
                 Err(e) => eprintln!("Error loading file: {e}"),
             }
         }
+    }
+
+    fn select_last_year(&mut self) {
+        self.selection.year = self.report.year_reports.len().saturating_sub(1);
+    }
+
+    fn select_last_entry(&mut self) {
+        self.selection.entry = self
+            .report
+            .year_reports
+            .get(self.selection.year)
+            .map(|year| year.lines.len().saturating_sub(1))
+            .unwrap_or(0);
+    }
+
+    fn year_entries_count(&self) -> usize {
+        self.report
+            .year_reports
+            .get(self.selection.year)
+            .map(|year| year.lines.len())
+            .unwrap_or(0)
     }
 
     fn create_block<'a>(&self, title: Line<'a>, focus_area: Focus) -> Block<'a> {
@@ -470,7 +462,7 @@ impl App {
         match result {
             Ok(()) => {
                 // Success - refresh the report and close popup
-                self.select_file();
+                self.reload_file();
                 self.close_popup();
             }
             Err(e) => {
@@ -766,5 +758,21 @@ fn make_line<'a>(
         line.style(Style::default().bg(bg_color))
     } else {
         line
+    }
+}
+
+fn next_index_cycled(current: usize, count: usize) -> usize {
+    if current + 1 >= count {
+        0
+    } else {
+        current.saturating_add(1)
+    }
+}
+
+fn previous_index_cycled(current: usize, count: usize) -> usize {
+    if current == 0 {
+        count.saturating_sub(1)
+    } else {
+        current.saturating_sub(1)
     }
 }
