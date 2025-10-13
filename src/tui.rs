@@ -521,10 +521,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     let has_focus = |focus| app.focus == focus && app.popup.mode == PopupMode::None;
 
-    let highlight_style = Style::default().bg(Color::Blue).fg(Color::Black);
-    let files_list = List::new(files)
-        .block(make_block("Files", has_focus(Focus::Files)))
-        .highlight_style(highlight_style);
+    let files_list = List::new(files).block(make_block("Files", has_focus(Focus::Files)));
     frame.render_stateful_widget(files_list, files_rect, &mut ListState::default());
 
     // Years list (middle column)
@@ -538,8 +535,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
             years_width,
         ))
     }))
-    .block(make_block(&app.report.title, has_focus(Focus::Years)))
-    .highlight_style(highlight_style);
+    .block(make_block(&app.report.title, has_focus(Focus::Years)));
 
     frame.render_stateful_widget(years_list, years_rect, &mut ListState::default());
 
@@ -560,8 +556,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     .block(make_block(
         &selected_year.title,
         has_focus(Focus::YearDetails),
-    ))
-    .highlight_style(highlight_style);
+    ));
 
     frame.render_stateful_widget(entries_list, entries_rect, &mut ListState::default());
 
