@@ -43,6 +43,10 @@ where
     B: ratatui::backend::Backend,
     E: IntoIterator<Item = Event>,
 {
+    let files = files
+        .into_iter()
+        .map(|path| File::new(path))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut app = App::new(files, format_options);
 
     // Draw initial state
@@ -151,7 +155,7 @@ enum PopupFocus {
 }
 
 struct App {
-    files: Vec<PathBuf>,
+    files: Vec<File>,
     format_options: FormatOptions,
     report: ReportViewModel,
     selection: Selection,
@@ -202,10 +206,10 @@ struct YearReportViewModel {
 
 impl ReportViewModel {
     fn new(
-        file: &Path,
+        file: &File,
         format_options: &FormatOptions,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let entries = entries_from_file(file)?;
+        let entries = entries_from_file(&file.path)?;
         let total: Decimal = entries.iter().map(|entry| entry.amount).sum();
         let mut years_map: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
         for entry in entries {
@@ -214,10 +218,7 @@ impl ReportViewModel {
             years_map.entry(year).or_default().push(entry);
         }
         Ok(ReportViewModel {
-            title: file
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .ok_or("Failed to get file name".to_string())?,
+            title: file.name.clone(),
             total: total.format(format_options),
             year_reports: years_map
                 .into_iter()
@@ -239,8 +240,23 @@ impl ReportViewModel {
     }
 }
 
+struct File {
+    path: PathBuf,
+    name: String,
+}
+
+impl File {
+    fn new(path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .ok_or("Failed to get file name".to_string())?;
+        Ok(File { path, name })
+    }
+}
+
 impl App {
-    fn new(files: Vec<PathBuf>, format_options: FormatOptions) -> Self {
+    fn new(files: Vec<File>, format_options: FormatOptions) -> Self {
         let mut app = Self {
             files,
             format_options,
@@ -433,13 +449,13 @@ impl App {
             }
         };
 
-        let file_path = &self.files[self.selection.file];
+        let file = &self.files[self.selection.file];
 
         let result = match self.popup.mode {
-            PopupMode::AddEntry => add_entry(file_path, date, amount)
+            PopupMode::AddEntry => add_entry(&file.path, date, amount)
                 .map(|_| ())
                 .map_err(|err| err.into()),
-            PopupMode::EditEntry => self.edit_entry_in_file(file_path, date, amount),
+            PopupMode::EditEntry => self.edit_entry_in_file(&file.path, date, amount),
             PopupMode::None => Ok(()),
         };
 
@@ -505,9 +521,9 @@ fn ui(frame: &mut Frame, app: &mut App) {
         .areas(main_rect);
 
     let files_width = files_rect.width.saturating_sub(2) as usize; // Account for block borders
-    let files = app.files.iter().enumerate().map(|(i, path)| {
+    let files = app.files.iter().enumerate().map(|(i, file)| {
         ListItem::new(make_line(
-            path.file_name().unwrap().to_string_lossy(),
+            &file.name,
             if i == app.selection.file {
                 &app.report.total
             } else {
@@ -628,11 +644,8 @@ fn render_popup(frame: &mut Frame, app: &App) {
         .areas(inner_area);
 
     // File name
-    let file_name = app.files[app.selection.file]
-        .file_name()
-        .unwrap()
-        .to_string_lossy();
-    let file_name_input = Input::new(file_name.into_owned());
+    let file = &app.files[app.selection.file];
+    let file_name_input = Input::new(file.name.clone());
     render_input_field(frame, "File  ", &file_name_input, file_name_rect, false);
 
     // Date field
