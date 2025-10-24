@@ -250,7 +250,10 @@ impl File {
         let name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
-            .ok_or("Failed to get file name".to_string())?;
+            .ok_or(format!(
+                "Failed to get file name for path: {}",
+                path.display()
+            ))?;
         Ok(File { path, name })
     }
 }
