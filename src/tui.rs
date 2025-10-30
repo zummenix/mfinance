@@ -62,7 +62,7 @@ where
                     // Normal navigation mode
                     match key.code {
                         KeyCode::Char('q') => break,
-                        KeyCode::Char('a') => {
+                        KeyCode::Char('n') => {
                             app.open_add_entry_popup();
                         }
                         KeyCode::Char('e') => {
@@ -580,7 +580,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_stateful_widget(entries_list, entries_rect, &mut ListState::default());
 
     let footer_text = if app.popup.mode == PopupMode::None {
-        "↓(j)/↑(k): Navigate | Tab: Focus | a/e: Add/Edit Entry | q: Quit"
+        "↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit"
     } else {
         "Tab: Switch Field | Enter: Save | q: Cancel"
     };
