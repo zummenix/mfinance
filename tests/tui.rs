@@ -104,7 +104,7 @@ fn press_enter() -> Vec<Event> {
     vec![key_event(KeyCode::Enter)]
 }
 
-fn press_add_entry() -> Vec<Event> {
+fn press_new_entry() -> Vec<Event> {
     vec![key_event(KeyCode::Char('n'))]
 }
 
@@ -358,7 +358,7 @@ fn test_entries_navigation() {
 fn test_add_entry_popup_open() {
     let fixture = TuiTestFixture::new();
 
-    let output = fixture.run_with_events(vec![press_add_entry()]);
+    let output = fixture.run_with_events(vec![press_new_entry()]);
 
     let mut settings = insta::Settings::clone_current();
     let current_date = chrono::Local::now().date_naive().to_string();
@@ -374,8 +374,8 @@ fn test_add_entry_popup_open() {
         "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
         "│                ║ File    expenses.csv                             ║                │"
         "│                ║                                                  ║                │"
-        "│                ║▌Date    0000-00-00                               ║                │"
-        "│                ║ Amount                                           ║                │"
+        "│                ║ Date    0000-00-00                               ║                │"
+        "│                ║▌Amount                                           ║                │"
         "│                ║                                                  ║                │"
         "│                ║                                                  ║                │"
         "│                ╚══════════════════════════════════════════════════╝                │"
@@ -467,7 +467,7 @@ fn test_popup_input_and_focus() {
 fn test_popup_close() {
     let fixture = TuiTestFixture::new();
 
-    let output = fixture.run_with_events(vec![press_add_entry(), press_close_popup()]);
+    let output = fixture.run_with_events(vec![press_new_entry(), press_close_popup()]);
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐"
@@ -501,13 +501,15 @@ fn test_add_entry_save_functionality() {
     let file_path = &fixture.files[0];
     let initial_content = std::fs::read_to_string(file_path).unwrap();
 
+    let switch_to_date_field = press_tab();
     let delete_old_date = repeat(press_backspace(), 10);
     let enter_new_date = type_text("2024-12-15");
     let switch_to_amount_field = press_tab();
     let enter_amount = type_text("500");
     let save_and_close_popup = press_enter();
     let _output = fixture.run_with_events(vec![
-        press_add_entry(),
+        press_new_entry(),
+        switch_to_date_field,
         delete_old_date,
         enter_new_date,
         switch_to_amount_field,
@@ -532,13 +534,15 @@ fn test_add_entry_save_functionality() {
 fn test_popup_error_handling() {
     let fixture = TuiTestFixture::new();
 
+    let switch_to_date_field = press_tab();
     let delete_old_date = repeat(press_backspace(), 10);
     let enter_invalid_date = type_text("invalid");
     let switch_to_amount_field = press_tab();
     let enter_valid_amount = type_text("500");
     let try_to_save = press_enter();
     let output = fixture.run_with_events(vec![
-        press_add_entry(),
+        press_new_entry(),
+        switch_to_date_field,
         delete_old_date,
         enter_invalid_date,
         switch_to_amount_field,
@@ -574,6 +578,7 @@ fn test_popup_error_handling() {
 fn test_popup_error_clearing() {
     let fixture = TuiTestFixture::new();
 
+    let switch_to_date_field = press_tab();
     let delete_old_date = repeat(press_backspace(), 10);
     let enter_invalid_date = type_text("bad");
     let switch_to_amount_field = press_tab();
@@ -581,7 +586,8 @@ fn test_popup_error_clearing() {
     let try_to_save = press_enter();
     let start_typing_to_clear_error = type_text("2");
     let output = fixture.run_with_events(vec![
-        press_add_entry(),
+        press_new_entry(),
+        switch_to_date_field,
         delete_old_date,
         enter_invalid_date,
         switch_to_amount_field,

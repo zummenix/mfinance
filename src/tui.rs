@@ -356,7 +356,7 @@ impl App {
 
     fn open_add_entry_popup(&mut self) {
         self.popup.mode = PopupMode::AddEntry;
-        self.popup.focus = PopupFocus::Date;
+        self.popup.focus = PopupFocus::Amount;
         // Set current date as default
         self.popup.date_input = Input::new(chrono::Local::now().date_naive().to_string());
         self.popup.amount_input = Input::default();
