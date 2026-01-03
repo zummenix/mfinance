@@ -11,12 +11,7 @@ use ratatui::crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{
-    Terminal,
-    layout::Position as CursorPosition,
-    prelude::*,
-    widgets::*,
-};
+use ratatui::{Terminal, layout::Position as CursorPosition, prelude::*, widgets::*};
 use rust_decimal::Decimal;
 use std::{
     collections::BTreeMap,
