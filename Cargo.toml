@@ -11,8 +11,8 @@ chrono = "0.4"
 serde = { version = "1.0.228", features = ["derive"] }
 main_error = "0.1.2"
 thiserror = "2.0.17"
-ratatui = "0.29"
-tui-input = "0.14"
+ratatui = "0.30"
+tui-input = "0.15"
 
 [dev-dependencies]
 insta = { version = "1.45.1", features = ["filters"] }
