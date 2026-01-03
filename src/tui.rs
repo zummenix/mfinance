@@ -15,7 +15,7 @@ use ratatui::{
     Terminal,
     layout::Position as CursorPosition,
     prelude::*,
-    widgets::{block::*, *},
+    widgets::*,
 };
 use rust_decimal::Decimal;
 use std::{
@@ -41,6 +41,7 @@ pub fn run_tui_loop<B, E>(
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     B: ratatui::backend::Backend,
+    <B as ratatui::backend::Backend>::Error: 'static,
     E: IntoIterator<Item = Event>,
 {
     let files = files
