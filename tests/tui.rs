@@ -1,5 +1,5 @@
 use insta::assert_snapshot;
-use mfinance::{number_formatter::FormatOptions, tui::run_tui_loop};
+use mfinance::{config::Config, tui::run_tui_loop};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{Terminal, backend::TestBackend};
 use std::{fs, path::PathBuf};
@@ -47,20 +47,19 @@ impl TuiTestFixture {
         }
     }
 
-    fn format_options() -> FormatOptions {
-        FormatOptions::default()
+    fn config() -> Config {
+        Config::default()
     }
 
     /// Run TUI with events and return final buffer content
     fn run_with_events(&self, events: impl IntoIterator<Item = Vec<Event>>) -> String {
         let files = self.files.clone();
-        let format_options = Self::format_options();
         let backend = TestBackend::new(86, 20);
         let mut terminal = Terminal::new(backend).expect("terminal created");
 
         run_tui_loop(
             files,
-            format_options,
+            Self::config(),
             &mut terminal,
             events.into_iter().flatten(),
         )

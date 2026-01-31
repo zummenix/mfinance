@@ -1,6 +1,8 @@
 use crate::add_entry;
 use crate::{
-    DELIMITER, Entry, entries_from_file,
+    DELIMITER, Entry,
+    config::Config,
+    entries_from_file,
     number_formatter::{FormatOptions, NumberFormatter},
 };
 use chrono::Datelike;
@@ -30,7 +32,7 @@ const SELECTION_INDICATOR_COLOR: Color = Color::Green;
 /// Exposed mostly for integration tests.
 pub fn run_tui_loop<B, E>(
     files: Vec<PathBuf>,
-    format_options: FormatOptions,
+    config: Config,
     terminal: &mut Terminal<B>,
     events: E,
 ) -> Result<(), Box<dyn std::error::Error>>
@@ -43,7 +45,7 @@ where
         .into_iter()
         .map(|path| File::new(path))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut app = App::new(files, format_options);
+    let mut app = App::new(files, config);
 
     // Draw initial state
     terminal.draw(|f| ui(f, &mut app))?;
@@ -110,10 +112,7 @@ where
     Ok(())
 }
 
-pub fn run_tui(
-    files: Vec<PathBuf>,
-    format_options: FormatOptions,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_tui(files: Vec<PathBuf>, config: Config) -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -123,7 +122,7 @@ pub fn run_tui(
     // Event iterator that reads from stdin until quit
     let events = std::iter::from_fn(|| event::read().ok());
 
-    let res = run_tui_loop(files, format_options, &mut terminal, events);
+    let res = run_tui_loop(files, config, &mut terminal, events);
 
     disable_raw_mode()?;
     execute!(std::io::stdout(), LeaveAlternateScreen)?;
@@ -152,7 +151,7 @@ enum PopupFocus {
 
 struct App {
     files: Vec<File>,
-    format_options: FormatOptions,
+    config: Config,
     report: ReportViewModel,
     selection: Selection,
     focus: Focus,
@@ -255,10 +254,10 @@ impl File {
 }
 
 impl App {
-    fn new(files: Vec<File>, format_options: FormatOptions) -> Self {
+    fn new(files: Vec<File>, config: Config) -> Self {
         let mut app = Self {
             files,
-            format_options,
+            config,
             focus: Focus::Files,
             report: ReportViewModel::default(),
             selection: Selection::default(),
@@ -320,7 +319,7 @@ impl App {
 
     fn reload_file(&mut self) {
         if let Some(path) = self.files.get(self.selection.file) {
-            match ReportViewModel::new(path, &self.format_options) {
+            match ReportViewModel::new(path, &self.config.formatting.format_options()) {
                 Ok(report) => {
                     self.report = report;
                 }

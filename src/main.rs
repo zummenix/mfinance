@@ -1,11 +1,12 @@
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use csv::WriterBuilder;
+use directories::ProjectDirs;
 use rust_decimal::Decimal;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use mfinance::number_formatter::FormatOptions;
+use mfinance::config;
 use mfinance::tui;
 use mfinance::{AppError, add_entry, entries_from_file, generate_report, generate_report_for_all};
 
@@ -58,7 +59,25 @@ enum Commands {
 
 fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
-    let format_options = FormatOptions::default();
+
+    // Load configuration
+    let config = {
+        // For data-specific config, we'll look in the directory of the data file (if any)
+        let data_path = match &cli.command {
+            Commands::Tui { path } => Some(path),
+            Commands::NewEntry { file, .. } => Some(file),
+            Commands::Report { file, .. } => Some(file),
+            Commands::Sort { file } => Some(file),
+        };
+        let data_dir = data_path.and_then(|p| if p.is_file() { p.parent() } else { Some(p) });
+        let data_config = data_dir
+            .map(|d| d.join("mfinance.toml"))
+            .filter(|p| p.exists());
+
+        config::Config::load(global_config_path(), data_config.as_deref())
+    };
+
+    let format_options = config.formatting.format_options();
 
     match cli.command {
         Commands::NewEntry { amount, date, file } => {
@@ -89,7 +108,7 @@ fn main() -> Result<(), main_error::MainError> {
                     context: format!("No CSV files found in directory: {}", path.display()),
                 }));
             }
-            tui::run_tui(files, format_options)?;
+            tui::run_tui(files, config)?;
         }
         Commands::Sort { file } => {
             let mut entries = entries_from_file(&file)?;
@@ -118,4 +137,18 @@ fn main() -> Result<(), main_error::MainError> {
     }
 
     Ok(())
+}
+
+fn global_config_path() -> Option<PathBuf> {
+    if std::env::var("MFINANCE_TEST_MODE").is_ok() {
+        return None;
+    }
+
+    let proj_dirs = ProjectDirs::from("", "", "mfinance");
+    let path = proj_dirs
+        .as_ref()
+        .map(|d: &ProjectDirs| d.config_dir().join("config.toml"));
+    path.as_deref()
+        .filter(|p| p.exists())
+        .map(|p| p.to_path_buf())
 }

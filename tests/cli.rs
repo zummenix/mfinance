@@ -243,7 +243,9 @@ fn test_version() {
 }
 
 fn cli() -> Command {
-    Command::new(get_cargo_bin("mfinance"))
+    let mut cmd = Command::new(get_cargo_bin("mfinance"));
+    cmd.env("MFINANCE_TEST_MODE", "1");
+    cmd
 }
 
 struct NewEntryArgs {

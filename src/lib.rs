@@ -1,3 +1,4 @@
+pub mod config;
 pub mod number_formatter;
 pub mod tui;
 
