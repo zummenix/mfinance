@@ -260,7 +260,7 @@ thousands_separator = "invalid"  # char expects single character
 
     // Add filter to normalize timestamp and log level in log output
     let mut settings = insta::Settings::clone_current();
-    settings.add_filter(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\s+WARN\s+[^\]]+\]", "[TIMESTAMP WARN mfinance::config]");
+    settings.add_filter(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\s+WARN\s+\w+(?:::\w+)*\]", "[TIMESTAMP WARN mfinance::config]");
     let _guard = settings.bind_to_scope();
 
     let args = ReportArgs::new();
