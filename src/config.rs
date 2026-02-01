@@ -1,6 +1,5 @@
 use crate::number_formatter::{CurrencyPosition, FormatOptions};
 use config;
-use log;
 use serde::Deserialize;
 use std::path::Path;
 
@@ -14,7 +13,7 @@ impl Config {
     pub fn load(
         global_config_path: Option<impl AsRef<Path>>,
         data_config_path: Option<impl AsRef<Path>>,
-    ) -> Self {
+    ) -> Result<Self, config::ConfigError> {
         let mut settings = config::Config::builder();
 
         if let Some(path) = global_config_path {
@@ -25,19 +24,8 @@ impl Config {
             settings = settings.add_source(config::File::from(path.as_ref()).required(false));
         }
 
-        match settings.build() {
-            Ok(settings) => match settings.try_deserialize::<Config>() {
-                Ok(config) => config,
-                Err(e) => {
-                    log::warn!("Failed to parse config: {e}");
-                    Config::default()
-                }
-            },
-            Err(e) => {
-                log::warn!("Failed to load config: {e}");
-                Config::default()
-            }
-        }
+        let settings = settings.build()?;
+        settings.try_deserialize::<Config>()
     }
 }
 
@@ -114,13 +102,13 @@ mod tests {
 
     #[test]
     fn test_without_configs() {
-        let config = Config::load(Option::<&Path>::None, Option::<&Path>::None);
+        let config = Config::load(Option::<&Path>::None, Option::<&Path>::None).unwrap();
         assert_eq!(config, Config::default());
     }
 
     #[test]
     fn test_load_invalid_path() {
-        let config = Config::load(Some("/nonexistent/path"), Option::<&Path>::None);
+        let config = Config::load(Some("/nonexistent/path"), Option::<&Path>::None).unwrap();
         assert_eq!(config, Config::default());
     }
 
@@ -133,9 +121,9 @@ mod tests {
             "#,
         );
 
-        let config = Config::load(Some(config_file.as_path()), Option::<&Path>::None);
-        // Should fall back to default on parse error
-        assert_eq!(config, Config::default());
+        let result = Config::load(Some(config_file.as_path()), Option::<&Path>::None);
+        // Should return error on parse error
+        assert!(result.is_err());
     }
 
     #[test]
@@ -150,7 +138,7 @@ mod tests {
             "#,
         );
 
-        let config = Config::load(Some(config_file.as_path()), Option::<&Path>::None);
+        let config = Config::load(Some(config_file.as_path()), Option::<&Path>::None).unwrap();
         let expected = FormattingConfig {
             currency: Some("$".to_string()),
             currency_position: Some(CurrencyPositionChoice::Prefix),
@@ -179,7 +167,7 @@ mod tests {
             "#,
         );
 
-        let config = Config::load(Some(global_config.as_path()), Some(data_config.as_path()));
+        let config = Config::load(Some(global_config.as_path()), Some(data_config.as_path())).unwrap();
         let expected = FormattingConfig {
             currency: Some("€".to_string()),
             currency_position: Some(CurrencyPositionChoice::Suffix),

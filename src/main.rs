@@ -58,11 +58,6 @@ enum Commands {
 }
 
 fn main() -> Result<(), main_error::MainError> {
-    // Initialize logger to stderr with warning level by default
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
-        .target(env_logger::Target::Stderr)
-        .init();
-
     let cli = Cli::parse();
 
     // Load configuration
@@ -94,7 +89,13 @@ fn main() -> Result<(), main_error::MainError> {
             .map(|d| d.join("mfinance.toml"))
             .filter(|p| p.exists());
 
-        config::Config::load(global_config_path(), data_config.as_deref())
+        match config::Config::load(global_config_path(), data_config.as_deref()) {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("Warning: Failed to load config: {e}");
+                config::Config::default()
+            }
+        }
     };
 
     let format_options = config.formatting.format_options();

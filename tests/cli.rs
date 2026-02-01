@@ -244,7 +244,7 @@ fn test_version() {
 
 #[test]
 fn test_config_warning_on_invalid_config() {
-    let mut csv_file = TempCsvFile::new();
+    let csv_file = TempCsvFile::new();
     csv_file.setup_test_content();
     
     // Create an invalid config file in the same directory
@@ -258,11 +258,6 @@ thousands_separator = "invalid"  # char expects single character
     )
     .expect("write invalid config");
 
-    // Add filter to normalize timestamp and log level in log output
-    let mut settings = insta::Settings::clone_current();
-    settings.add_filter(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\s+WARN\s+\w+(?:::\w+)*\]", "[TIMESTAMP WARN mfinance::config]");
-    let _guard = settings.bind_to_scope();
-
     let args = ReportArgs::new();
     assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r###"
     success: true
@@ -275,7 +270,7 @@ thousands_separator = "invalid"  # char expects single character
     Total amount: 3 510.42
 
     ----- stderr -----
-    [TIMESTAMP WARN mfinance::config] Failed to parse config: invalid value: string "invalid", expected a character for key `formatting.thousands_separator`
+    Warning: Failed to load config: invalid value: string "invalid", expected a character for key `formatting.thousands_separator`
     "###);
 }
 
