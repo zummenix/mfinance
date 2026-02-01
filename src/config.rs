@@ -1,5 +1,6 @@
 use crate::number_formatter::{CurrencyPosition, FormatOptions};
 use config;
+use log;
 use serde::Deserialize;
 use std::path::Path;
 
@@ -28,12 +29,12 @@ impl Config {
             Ok(settings) => match settings.try_deserialize::<Config>() {
                 Ok(config) => config,
                 Err(e) => {
-                    eprintln!("Warning! Failed to parse config: {e}");
+                    log::warn!("Failed to parse config: {e}");
                     Config::default()
                 }
             },
             Err(e) => {
-                eprintln!("Warning! Failed to load config: {e}");
+                log::warn!("Failed to load config: {e}");
                 Config::default()
             }
         }
@@ -120,6 +121,20 @@ mod tests {
     #[test]
     fn test_load_invalid_path() {
         let config = Config::load(Some("/nonexistent/path"), Option::<&Path>::None);
+        assert_eq!(config, Config::default());
+    }
+
+    #[test]
+    fn test_load_invalid_config_content() {
+        let (_dir, config_file) = create_temp_config(
+            r#"
+            [formatting]
+            thousands_separator = "invalid"  # char expects single character
+            "#,
+        );
+
+        let config = Config::load(Some(config_file.as_path()), Option::<&Path>::None);
+        // Should fall back to default on parse error
         assert_eq!(config, Config::default());
     }
 

@@ -1110,6 +1110,7 @@ dependencies = [
  "directories",
  "insta",
  "insta-cmd",
+ "log",
  "main_error",
  "ratatui",
  "rust_decimal",
