@@ -264,7 +264,19 @@ thousands_separator = "invalid"  # char expects single character
     let _guard = settings.bind_to_scope();
 
     let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()));
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      2024-09-11:   700.00
+      2024-10-01:  -200.00
+      2024-10-02: 3 000.42
+      2025-01-01:    10.00
+    Total amount: 3 510.42
+
+    ----- stderr -----
+    [TIMESTAMP WARN mfinance::config] Failed to parse config: invalid value: string "invalid", expected a character for key `formatting.thousands_separator`
+    "###);
 }
 
 fn cli() -> Command {
