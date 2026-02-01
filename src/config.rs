@@ -85,6 +85,7 @@ impl Default for FormattingConfig {
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
 pub enum CurrencyPositionChoice {
     Prefix,
     Suffix,
