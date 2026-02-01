@@ -89,7 +89,13 @@ fn main() -> Result<(), main_error::MainError> {
             .map(|d| d.join("mfinance.toml"))
             .filter(|p| p.exists());
 
-        config::Config::load(global_config_path(), data_config.as_deref())
+        match config::Config::load(global_config_path(), data_config.as_deref()) {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("Warning: Failed to load config: {e}");
+                config::Config::default()
+            }
+        }
     };
 
     let format_options = config.formatting.format_options();

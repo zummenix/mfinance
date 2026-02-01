@@ -242,6 +242,38 @@ fn test_version() {
     ");
 }
 
+#[test]
+fn test_config_warning_on_invalid_config() {
+    let csv_file = TempCsvFile::new();
+    csv_file.setup_test_content();
+
+    // Create an invalid config file in the same directory
+    let config_path = csv_file.tempdir.child("mfinance.toml");
+    fs::write(
+        &config_path,
+        r#"
+[formatting]
+thousands_separator = "invalid"  # char expects single character
+        "#,
+    )
+    .expect("write invalid config");
+
+    let args = ReportArgs::new();
+    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      2024-09-11:   700.00
+      2024-10-01:  -200.00
+      2024-10-02: 3 000.42
+      2025-01-01:    10.00
+    Total amount: 3 510.42
+
+    ----- stderr -----
+    Warning: Failed to load config: invalid value: string "invalid", expected a character for key `formatting.thousands_separator`
+    "###);
+}
+
 fn cli() -> Command {
     let mut cmd = Command::new(get_cargo_bin("mfinance"));
     cmd.env("MFINANCE_TEST_MODE", "1");
