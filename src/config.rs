@@ -55,14 +55,14 @@ pub struct FormattingConfig {
 
 impl FormattingConfig {
     pub fn format_options(&self) -> FormatOptions {
-        let currency = match self.currency_position {
-            None => CurrencyPosition::None,
-            Some(CurrencyPositionChoice::Prefix) => {
-                CurrencyPosition::Prefix(self.currency.clone().unwrap_or_default())
+        let currency = match (self.currency.as_ref(), self.currency_position) {
+            (Some(symbol), Some(CurrencyPositionChoice::Prefix)) => {
+                CurrencyPosition::Prefix(symbol.clone())
             }
-            Some(CurrencyPositionChoice::Suffix) => {
-                CurrencyPosition::Suffix(self.currency.clone().unwrap_or_default())
+            (Some(symbol), Some(CurrencyPositionChoice::Suffix)) => {
+                CurrencyPosition::Suffix(symbol.clone())
             }
+            _ => CurrencyPosition::None,
         };
 
         FormatOptions {
@@ -84,7 +84,7 @@ impl Default for FormattingConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
 pub enum CurrencyPositionChoice {
     Prefix,
     Suffix,
@@ -106,7 +106,8 @@ mod tests {
     #[test]
     fn test_default_format_options() {
         let config = Config::default();
-        assert_eq!(config.formatting.format_options(), FormatOptions::default());
+        let expected = FormattingConfig::default().format_options();
+        assert_eq!(config.formatting.format_options(), expected);
     }
 
     #[test]

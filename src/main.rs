@@ -69,7 +69,22 @@ fn main() -> Result<(), main_error::MainError> {
             Commands::Report { file, .. } => Some(file),
             Commands::Sort { file } => Some(file),
         };
-        let data_dir = data_path.and_then(|p| if p.is_file() { p.parent() } else { Some(p) });
+        let data_dir = data_path.and_then(|p| {
+            if p.exists() {
+                if p.is_file() {
+                    p.parent()
+                } else {
+                    Some(p.as_path())
+                }
+            } else {
+                // Path doesn't exist yet: assume it's a file if it has an extension
+                if p.extension().is_some() {
+                    p.parent()
+                } else {
+                    Some(p.as_path())
+                }
+            }
+        });
         let data_config = data_dir
             .map(|d| d.join("mfinance.toml"))
             .filter(|p| p.exists());
@@ -148,7 +163,5 @@ fn global_config_path() -> Option<PathBuf> {
     let path = proj_dirs
         .as_ref()
         .map(|d: &ProjectDirs| d.config_dir().join("config.toml"));
-    path.as_deref()
-        .filter(|p| p.exists())
-        .map(|p| p.to_path_buf())
+    path.filter(|p| p.exists())
 }
