@@ -58,6 +58,11 @@ enum Commands {
 }
 
 fn main() -> Result<(), main_error::MainError> {
+    // Initialize logger to stderr with warning level by default
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+        .target(env_logger::Target::Stderr)
+        .init();
+
     let cli = Cli::parse();
 
     // Load configuration
