@@ -4,29 +4,18 @@ pub trait NumberFormatter {
     fn format(&self, options: &FormatOptions) -> String;
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CurrencyPosition {
     None,
     Prefix(String),
     Suffix(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormatOptions {
     pub thousands_separator: char,
     pub decimal_separator: char,
     pub currency: CurrencyPosition,
-}
-
-impl Default for FormatOptions {
-    fn default() -> Self {
-        Self {
-            thousands_separator: '\u{a0}', // Non-breaking space
-            decimal_separator: '.',
-            currency: CurrencyPosition::None,
-        }
-    }
 }
 
 impl NumberFormatter for Decimal {
@@ -63,6 +52,16 @@ impl NumberFormatter for Decimal {
 mod tests {
     use super::*;
     use rust_decimal::{Decimal, prelude::FromPrimitive};
+
+    impl Default for FormatOptions {
+        fn default() -> Self {
+            Self {
+                thousands_separator: '\u{a0}', // Non-breaking space
+                decimal_separator: '.',
+                currency: CurrencyPosition::None,
+            }
+        }
+    }
 
     #[test]
     fn format_with_currency_prefix() {
