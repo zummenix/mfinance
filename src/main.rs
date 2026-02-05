@@ -60,44 +60,13 @@ enum Commands {
 fn main() -> Result<(), main_error::MainError> {
     let cli = Cli::parse();
 
-    // Load configuration
-    let config = {
-        // For data-specific config, we'll look in the directory of the data file (if any)
-        let data_path = match &cli.command {
-            Commands::Tui { path } => Some(path),
-            Commands::NewEntry { file, .. } => Some(file),
-            Commands::Report { file, .. } => Some(file),
-            Commands::Sort { file } => Some(file),
-        };
-        let data_dir = data_path.and_then(|p| {
-            if p.exists() {
-                if p.is_file() {
-                    p.parent()
-                } else {
-                    Some(p.as_path())
-                }
-            } else {
-                // Path doesn't exist yet: assume it's a file if it has an extension
-                if p.extension().is_some() {
-                    p.parent()
-                } else {
-                    Some(p.as_path())
-                }
-            }
-        });
-        let data_config = data_dir
-            .map(|d| d.join("mfinance.toml"))
-            .filter(|p| p.exists());
-
-        match config::Config::load(global_config_path(), data_config.as_deref()) {
-            Ok(config) => config,
-            Err(e) => {
-                eprintln!("Warning: Failed to load config: {e}");
-                config::Config::default()
-            }
+    let config = match load_config(&cli) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Warning: Failed to load config: {e}");
+            config::Config::default()
         }
     };
-
     let format_options = config.formatting.format_options();
 
     match cli.command {
@@ -158,6 +127,47 @@ fn main() -> Result<(), main_error::MainError> {
     }
 
     Ok(())
+}
+
+fn load_config(cli: &Cli) -> Result<config::Config, ::config::ConfigError> {
+    let data_path = match &cli.command {
+        Commands::Tui { path } => Some(path),
+        Commands::NewEntry { file, .. } => Some(file),
+        Commands::Report { file, .. } => Some(file),
+        Commands::Sort { file } => Some(file),
+    };
+    let data_dir = data_path.and_then(|p| {
+        if p.exists() {
+            if p.is_file() {
+                p.parent()
+            } else {
+                Some(p.as_path())
+            }
+        } else {
+            // Path doesn't exist yet: assume it's a file if it has an extension
+            if p.extension().is_some() {
+                p.parent()
+            } else {
+                Some(p.as_path())
+            }
+        }
+    });
+    let data_config = data_dir
+        .map(|d| d.join("mfinance.toml"))
+        .filter(|p| p.exists());
+
+    let mut settings = ::config::Config::builder();
+
+    if let Some(path) = global_config_path() {
+        settings = settings.add_source(::config::File::from(path.as_ref()).required(false));
+    }
+
+    if let Some(path) = data_config.as_deref() {
+        settings = settings.add_source(::config::File::from(path).required(false));
+    }
+
+    let settings = settings.build()?;
+    settings.try_deserialize::<config::Config>()
 }
 
 fn global_config_path() -> Option<PathBuf> {
