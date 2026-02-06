@@ -8,10 +8,10 @@ use std::{
 
 #[test]
 fn new_entry_subtract() {
-    let csv_file = TempCsvFile::new();
+    let test_context = TestContext::new();
 
-    let args = NewEntryArgs::with_amount("-900");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["new-entry", "--amount", "-900"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -25,11 +25,11 @@ fn new_entry_subtract() {
 
 #[test]
 fn new_entry_into_existing_file() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = NewEntryArgs::with_amount("42.42");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["new-entry", "--amount", "42.42"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -43,11 +43,11 @@ fn new_entry_into_existing_file() {
 
 #[test]
 fn new_entry_with_date_into_existing_file() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = NewEntryArgs::with_amount("42.42").date("2024-09-12");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["new-entry", "--amount", "42.42", "--date", "2024-09-12"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -58,7 +58,7 @@ fn new_entry_with_date_into_existing_file() {
     ----- stderr -----
     ");
 
-    assert_snapshot!(csv_file.content(), @r"
+    assert_snapshot!(test_context.content(), @r"
     date;amount
     2024-10-01;-200
     2024-09-11;700
@@ -70,11 +70,11 @@ fn new_entry_with_date_into_existing_file() {
 
 #[test]
 fn new_entry_with_invalid_date_error() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = NewEntryArgs::with_amount("42.42").date("2024-12");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["new-entry", "--amount", "42.42", "--date", "2024-12"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -87,11 +87,11 @@ fn new_entry_with_invalid_date_error() {
 
 #[test]
 fn report_without_filter() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -107,11 +107,11 @@ fn report_without_filter() {
 
 #[test]
 fn report_filter_year() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = ReportArgs::new().filter("2024");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report", "--filter", "2024"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -126,11 +126,11 @@ fn report_filter_year() {
 
 #[test]
 fn report_filter_year_no_entries_error() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = ReportArgs::new().filter("2020");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report", "--filter", "2020"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -142,11 +142,11 @@ fn report_filter_year_no_entries_error() {
 
 #[test]
 fn report_filter_year_month() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = ReportArgs::new().filter("2024-10");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report", "--filter", "2024-10"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -160,11 +160,11 @@ fn report_filter_year_month() {
 
 #[test]
 fn report_filter_year_month_no_entries_error() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = ReportArgs::new().filter("2020-01");
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report", "--filter", "2020-01"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -176,11 +176,11 @@ fn report_filter_year_month_no_entries_error() {
 
 #[test]
 fn report_no_file_error() {
-    let mut csv_file = TempCsvFile::new();
-    csv_file.setup_insta_filter();
+    let mut test_context = TestContext::new();
+    test_context.setup_insta_filter();
 
-    let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -193,11 +193,11 @@ fn report_no_file_error() {
 
 #[test]
 fn report_no_entries_error() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_empty_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_empty_test_content();
 
-    let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -209,11 +209,11 @@ fn report_no_entries_error() {
 
 #[test]
 fn sort() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
-    let args = SortArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["sort"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -221,7 +221,7 @@ fn sort() {
     ----- stderr -----
     ");
 
-    assert_snapshot!(csv_file.content(), @r"
+    assert_snapshot!(test_context.content(), @r"
     date;amount
     2024-09-11;700
     2024-10-01;-200
@@ -232,7 +232,8 @@ fn sort() {
 
 #[test]
 fn test_version() {
-    assert_cmd_snapshot!(cli().arg("--version"), @r"
+    let args = vec!["--version"];
+    assert_cmd_snapshot!(Cli::with_args(args).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -244,22 +245,22 @@ fn test_version() {
 
 #[test]
 fn test_config_warning_on_invalid_config() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
     // Create an invalid config file in the same directory
-    let config_path = csv_file.tempdir.child("mfinance.toml");
+    let config_path = test_context.tempdir.child("mfinance.toml");
     fs::write(
         &config_path,
         r#"
-[formatting]
-thousands_separator = "invalid"  # char expects single character
+        [formatting]
+        thousands_separator = "invalid"  # char expects single character
         "#,
     )
     .expect("write invalid config");
 
-    let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r###"
+    let args = vec!["report"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -276,11 +277,11 @@ thousands_separator = "invalid"  # char expects single character
 
 #[test]
 fn test_config_with_only_data() {
-    let csv_file = TempCsvFile::new();
-    csv_file.setup_test_content();
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
 
     // Create data config
-    let data_config_path = csv_file.tempdir.child("mfinance.toml");
+    let data_config_path = test_context.tempdir.child("mfinance.toml");
     fs::write(
         &data_config_path,
         r#"
@@ -292,8 +293,8 @@ fn test_config_with_only_data() {
     )
     .expect("write data config");
 
-    let args = ReportArgs::new();
-    assert_cmd_snapshot!(args.cmd(&csv_file.path()), @r"
+    let args = vec!["report"];
+    assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -307,86 +308,37 @@ fn test_config_with_only_data() {
     ");
 }
 
-fn cli() -> Command {
-    let mut cmd = Command::new(get_cargo_bin("mfinance"));
-    cmd.env("MFINANCE_TEST_MODE", "1");
-    cmd
+struct Cli {
+    command: Command,
 }
 
-struct NewEntryArgs {
-    amount: &'static str,
-    date: Option<&'static str>,
-}
-
-impl NewEntryArgs {
-    fn with_amount(amount: &'static str) -> Self {
-        NewEntryArgs { amount, date: None }
+impl Cli {
+    fn with_args(args: Vec<&str>) -> Self {
+        let mut command = Command::new(get_cargo_bin("mfinance"));
+        command.env("MFINANCE_TEST_MODE", "1");
+        command.args(&args);
+        Self { command }
     }
 
-    fn date(mut self, date: &'static str) -> Self {
-        self.date = Some(date);
+    fn path(mut self, path: impl AsRef<Path>) -> Self {
+        self.command.arg(path.as_ref().as_os_str());
         self
     }
 
-    fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = cli();
-        cmd.arg("new-entry").arg("--amount").arg(self.amount);
-        if let Some(date) = self.date {
-            cmd.arg("--date").arg(date);
-        }
-        cmd.arg(file.as_os_str());
-        cmd
+    fn cmd(self) -> Command {
+        self.command
     }
 }
 
-struct ReportArgs {
-    filter: Option<&'static str>,
-}
-
-impl ReportArgs {
-    fn new() -> Self {
-        ReportArgs { filter: None }
-    }
-
-    fn filter(mut self, filter: &'static str) -> Self {
-        self.filter = Some(filter);
-        self
-    }
-
-    fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = cli();
-        cmd.arg("report");
-        if let Some(filter) = self.filter {
-            cmd.arg("--filter").arg(filter);
-        }
-        cmd.arg(file.as_os_str());
-        cmd
-    }
-}
-
-struct SortArgs;
-
-impl SortArgs {
-    fn new() -> Self {
-        SortArgs
-    }
-
-    fn cmd(&self, file: &Path) -> Command {
-        let mut cmd = cli();
-        cmd.arg("sort").arg(file.as_os_str());
-        cmd
-    }
-}
-
-struct TempCsvFile {
+struct TestContext {
     tempdir: temp_dir::TempDir,
     #[allow(dyn_drop)]
     insta_settings_bind_drop_guard: Option<Box<dyn Drop>>,
 }
 
-impl TempCsvFile {
+impl TestContext {
     fn new() -> Self {
-        TempCsvFile {
+        TestContext {
             tempdir: temp_dir::TempDir::with_prefix("mfinance-").unwrap(),
             insta_settings_bind_drop_guard: None,
         }
@@ -398,24 +350,24 @@ impl TempCsvFile {
         self.insta_settings_bind_drop_guard = Some(Box::new(settings.bind_to_scope()));
     }
 
-    fn path(&self) -> PathBuf {
+    fn content_path(&self) -> PathBuf {
         self.tempdir.child("test.csv")
     }
 
     fn setup_test_content(&self) {
         // The content is intentionally unsorted.
         fs::write(
-            self.path(),
+            self.content_path(),
             "date;amount\n2024-10-01;-200\n2024-09-11;700\n2024-10-02;3000.42\n2025-01-01;10\n",
         )
         .expect("write test.csv");
     }
 
     fn setup_empty_test_content(&self) {
-        fs::write(self.path(), "date;amount\n").expect("write empty test.csv");
+        fs::write(self.content_path(), "date;amount\n").expect("write empty test.csv");
     }
 
     fn content(&self) -> String {
-        fs::read_to_string(self.path()).expect("read test.csv")
+        fs::read_to_string(self.content_path()).expect("read test.csv")
     }
 }
