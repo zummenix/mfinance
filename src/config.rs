@@ -1,32 +1,10 @@
 use crate::number_formatter::{CurrencyPosition, FormatOptions};
-use config;
 use serde::Deserialize;
-use std::path::Path;
 
 #[derive(Debug, Clone, Default, Deserialize, Eq, PartialEq)]
 #[serde(default)]
 pub struct Config {
     pub formatting: FormattingConfig,
-}
-
-impl Config {
-    pub fn load(
-        global_config_path: Option<impl AsRef<Path>>,
-        data_config_path: Option<impl AsRef<Path>>,
-    ) -> Result<Self, config::ConfigError> {
-        let mut settings = config::Config::builder();
-
-        if let Some(path) = global_config_path {
-            settings = settings.add_source(config::File::from(path.as_ref()).required(false));
-        }
-
-        if let Some(path) = data_config_path {
-            settings = settings.add_source(config::File::from(path.as_ref()).required(false));
-        }
-
-        let settings = settings.build()?;
-        settings.try_deserialize::<Config>()
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -83,100 +61,12 @@ pub enum CurrencyPositionChoice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-    use temp_dir::TempDir;
-
-    fn create_temp_config(content: &str) -> (TempDir, PathBuf) {
-        let dir = TempDir::new().unwrap();
-        let file_path = dir.child("config.toml");
-        std::fs::write(&file_path, content).unwrap();
-        (dir, file_path)
-    }
 
     #[test]
     fn test_default_format_options() {
         let config = Config::default();
         let expected = FormattingConfig::default().format_options();
         assert_eq!(config.formatting.format_options(), expected);
-    }
-
-    #[test]
-    fn test_without_configs() {
-        let config = Config::load(Option::<&Path>::None, Option::<&Path>::None).unwrap();
-        assert_eq!(config, Config::default());
-    }
-
-    #[test]
-    fn test_load_invalid_path() {
-        let config = Config::load(Some("/nonexistent/path"), Option::<&Path>::None).unwrap();
-        assert_eq!(config, Config::default());
-    }
-
-    #[test]
-    fn test_load_invalid_config_content() {
-        let (_dir, config_file) = create_temp_config(
-            r#"
-            [formatting]
-            thousands_separator = "invalid"  # char expects single character
-            "#,
-        );
-
-        let result = Config::load(Some(config_file.as_path()), Option::<&Path>::None);
-        // Should return error on parse error
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_load_from_file() {
-        let (_dir, config_file) = create_temp_config(
-            r#"
-            [formatting]
-            currency_symbol = "$"
-            currency_position = "Prefix"
-            thousands_separator = ","
-            decimal_separator = "."
-            "#,
-        );
-
-        let config = Config::load(Some(config_file.as_path()), Option::<&Path>::None).unwrap();
-        let expected = FormattingConfig {
-            currency: Some("$".to_string()),
-            currency_position: Some(CurrencyPositionChoice::Prefix),
-            thousands_separator: ',',
-            decimal_separator: '.',
-        };
-
-        assert_eq!(config.formatting, expected);
-    }
-
-    #[test]
-    fn test_load_multiple_configs() {
-        let (_global_dir, global_config) = create_temp_config(
-            r#"
-            [formatting]
-            currency_symbol = "€"
-            decimal_separator = ","
-            "#,
-        );
-
-        let (_data_dir, data_config) = create_temp_config(
-            r#"
-            [formatting]
-            currency_position = "Suffix"
-            thousands_separator = "."
-            "#,
-        );
-
-        let config =
-            Config::load(Some(global_config.as_path()), Some(data_config.as_path())).unwrap();
-        let expected = FormattingConfig {
-            currency: Some("€".to_string()),
-            currency_position: Some(CurrencyPositionChoice::Suffix),
-            thousands_separator: '.',
-            decimal_separator: ',',
-        };
-
-        assert_eq!(config.formatting, expected);
     }
 
     #[test]
@@ -190,9 +80,13 @@ mod tests {
         };
 
         let format_options = config.formatting.format_options();
-        assert!(matches!(
-            format_options.currency,
-            CurrencyPosition::Prefix(s) if s == "$"
-        ));
+        assert_eq!(
+            format_options,
+            FormatOptions {
+                thousands_separator: '\u{a0}',
+                decimal_separator: ',',
+                currency: CurrencyPosition::Prefix(String::from("$"))
+            }
+        );
     }
 }
