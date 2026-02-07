@@ -276,22 +276,85 @@ fn test_config_warning_on_invalid_config() {
 }
 
 #[test]
+fn test_config_with_global_and_data() {
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
+    test_context.setup_global_config(
+        r#"
+        [formatting]
+        currency_symbol = "€ "
+        decimal_separator = ","
+        "#,
+    );
+
+    test_context.setup_data_config(
+        r#"
+        [formatting]
+        currency_position = "Prefix"
+        thousands_separator = "."
+        "#,
+    );
+
+    let args = vec!["report"];
+    let cli = Cli::with_args(args)
+        .global_config_dir(test_context.path())
+        .path(test_context.content_path());
+    assert_cmd_snapshot!(cli.cmd(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      2024-09-11:   € 700,00
+      2024-10-01:  € -200,00
+      2024-10-02: € 3.000,42
+      2025-01-01:    € 10,00
+    Total amount: € 3.510,42
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
+fn test_config_with_only_global() {
+    let test_context = TestContext::new();
+    test_context.setup_test_content();
+    test_context.setup_global_config(
+        r#"
+        [formatting]
+        currency_symbol = "€"
+        decimal_separator = ","
+        "#,
+    );
+
+    let args = vec!["report"];
+    let cli = Cli::with_args(args)
+        .global_config_dir(test_context.path())
+        .path(test_context.content_path());
+    assert_cmd_snapshot!(cli.cmd(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      2024-09-11:   700,00
+      2024-10-01:  -200,00
+      2024-10-02: 3 000,42
+      2025-01-01:    10,00
+    Total amount: 3 510,42
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn test_config_with_only_data() {
     let test_context = TestContext::new();
     test_context.setup_test_content();
-
-    // Create data config
-    let data_config_path = test_context.tempdir.child("mfinance.toml");
-    fs::write(
-        &data_config_path,
+    test_context.setup_data_config(
         r#"
         [formatting]
         currency_symbol = " $"
         currency_position = "Suffix"
         thousands_separator = ","
         "#,
-    )
-    .expect("write data config");
+    );
 
     let args = vec!["report"];
     assert_cmd_snapshot!(Cli::with_args(args).path(test_context.content_path()).cmd(), @r"
@@ -315,13 +378,19 @@ struct Cli {
 impl Cli {
     fn with_args(args: Vec<&str>) -> Self {
         let mut command = Command::new(get_cargo_bin("mfinance"));
-        command.env("MFINANCE_TEST_MODE", "1");
+        command.env("MFINANCE_CONFIG_DIR", "");
         command.args(&args);
         Self { command }
     }
 
     fn path(mut self, path: impl AsRef<Path>) -> Self {
         self.command.arg(path.as_ref().as_os_str());
+        self
+    }
+
+    fn global_config_dir(mut self, path: impl AsRef<Path>) -> Self {
+        self.command
+            .env("MFINANCE_CONFIG_DIR", path.as_ref().as_os_str());
         self
     }
 
@@ -350,6 +419,10 @@ impl TestContext {
         self.insta_settings_bind_drop_guard = Some(Box::new(settings.bind_to_scope()));
     }
 
+    fn path(&self) -> &Path {
+        self.tempdir.path()
+    }
+
     fn content_path(&self) -> PathBuf {
         self.tempdir.child("test.csv")
     }
@@ -361,6 +434,16 @@ impl TestContext {
             "date;amount\n2024-10-01;-200\n2024-09-11;700\n2024-10-02;3000.42\n2025-01-01;10\n",
         )
         .expect("write test.csv");
+    }
+
+    fn setup_global_config(&self, content: &str) {
+        let path = self.tempdir.child("config.toml");
+        fs::write(&path, content).expect("write global config");
+    }
+
+    fn setup_data_config(&self, content: &str) {
+        let path = self.tempdir.child("mfinance.toml");
+        fs::write(&path, content).expect("write data config");
     }
 
     fn setup_empty_test_content(&self) {

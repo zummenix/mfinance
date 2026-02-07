@@ -171,13 +171,19 @@ fn load_config(cli: &Cli) -> Result<config::Config, ::config::ConfigError> {
 }
 
 fn global_config_path() -> Option<PathBuf> {
-    if std::env::var("MFINANCE_TEST_MODE").is_ok() {
-        return None;
+    let config_file_name = "config.toml";
+    if let Ok(s) = std::env::var("MFINANCE_CONFIG_DIR") {
+        if s.is_empty() {
+            return None;
+        } else {
+            let path = PathBuf::from(s).join(config_file_name);
+            return if path.exists() { Some(path) } else { None };
+        }
     }
 
     let proj_dirs = ProjectDirs::from("", "", "mfinance");
     let path = proj_dirs
         .as_ref()
-        .map(|d: &ProjectDirs| d.config_dir().join("config.toml"));
+        .map(|d: &ProjectDirs| d.config_dir().join(config_file_name));
     path.filter(|p| p.exists())
 }
