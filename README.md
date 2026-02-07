@@ -55,6 +55,42 @@ date;amount
 2025-01-01;10.00
 ```
 
+## Configuration
+
+mfinance supports two levels of configuration: global and local (data).
+
+### Global Configuration
+
+Global configuration applies to all mfinance instances and is stored in a file
+named `config.toml` in the user's configuration directory. The location of this
+directory varies by operating system:
+
+- **Linux**: `~/.config/mfinance/config.toml`
+- **macOS**: `~/Library/Application Support/mfinance/config.toml`
+- **Windows**: `%APPDATA%\mfinance\config.toml`
+
+### Local (Data) Configuration
+
+Local configuration applies only to specific CSV files and is stored in a file
+named `mfinance.toml` in the same directory as the CSV file.
+
+### Configuration Precedence
+
+1. Local (data) configuration takes precedence over global configuration
+2. If no configuration file is found, mfinance uses default settings
+
+### Configuration Format
+
+Configuration files use TOML format. Here's an example configuration:
+
+```toml
+[formatting]
+currency_symbol = "€"          # The currency symbol to display (e.g., "$", "€", "£")
+currency_position = "Prefix"   # Where to place the currency symbol ("Prefix" or "Suffix")
+thousands_separator = "\u{a0}" # Character used to separate thousands (default: non-breaking space)
+decimal_separator = ","        # Character used for decimal points (default: ".")
+```
+
 ## Contributing
 
 Contributions are welcome! Please open an issue first to discuss proposed changes.
