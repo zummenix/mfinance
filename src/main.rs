@@ -171,13 +171,30 @@ fn load_config(cli: &Cli) -> Result<config::Config, ::config::ConfigError> {
 }
 
 fn global_config_path() -> Option<PathBuf> {
-    if std::env::var("MFINANCE_TEST_MODE").is_ok() {
-        return None;
+    let config_file_name = "config.toml";
+    if let Some(config_dir) = std::env::var_os("MFINANCE_CONFIG_DIR") {
+        if config_dir.is_empty() {
+            // Explicitly disable global config when the override is an empty string.
+            // Useful in tests.
+            return None;
+        } else {
+            let path = PathBuf::from(&config_dir).join(config_file_name);
+            if path.exists() {
+                return Some(path);
+            } else {
+                eprintln!(
+                    "Warning: MFINANCE_CONFIG_DIR is set to '{}' but '{}' was not found. Global config is not loaded.",
+                    config_dir.to_string_lossy(),
+                    path.to_string_lossy()
+                );
+                return None;
+            }
+        }
     }
 
     let proj_dirs = ProjectDirs::from("", "", "mfinance");
     let path = proj_dirs
         .as_ref()
-        .map(|d: &ProjectDirs| d.config_dir().join("config.toml"));
+        .map(|d: &ProjectDirs| d.config_dir().join(config_file_name));
     path.filter(|p| p.exists())
 }
