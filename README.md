@@ -88,7 +88,7 @@ Configuration files use TOML format. Here's an example configuration:
 [formatting]
 currency_symbol = "€"          # The currency symbol to display (e.g., "$", "€", "£")
 currency_position = "Prefix"   # Where to place the currency symbol ("Prefix" or "Suffix")
-thousands_separator = "\u{a0}" # Character used to separate thousands (default: non-breaking space)
+thousands_separator = "\u00A0" # Character used to separate thousands (default: non-breaking space)
 decimal_separator = ","        # Character used for decimal points (default: ".")
 ```
 
