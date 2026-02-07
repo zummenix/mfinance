@@ -172,7 +172,7 @@ fn load_config(cli: &Cli) -> Result<config::Config, ::config::ConfigError> {
 
 fn global_config_path() -> Option<PathBuf> {
     let config_file_name = "config.toml";
-    if let Ok(s) = std::env::var("MFINANCE_CONFIG_DIR") {
+    if let Some(s) = std::env::var_os("MFINANCE_CONFIG_DIR") {
         if s.is_empty() {
             return None;
         } else {
