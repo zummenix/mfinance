@@ -71,8 +71,9 @@ directory varies by operating system:
 
 ### Local (Data) Configuration
 
-Local configuration applies only to specific CSV files and is stored in a file
-named `mfinance.toml` in the same directory as the CSV file.
+Local configuration is stored in a file named `mfinance.toml` and is applied to
+all CSV files located in the same directory (including when using `mfinance tui`
+with that directory).
 
 ### Configuration Precedence
 
