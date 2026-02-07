@@ -320,7 +320,7 @@ fn test_config_with_only_global() {
     test_context.setup_global_config(
         r#"
         [formatting]
-        currency_symbol = "€"
+        currency_symbol = "€"  # Note: currency_symbol without currency_position means the symbol won't be displayed
         decimal_separator = ","
         "#,
     );
