@@ -9,3 +9,10 @@ updates:
   schedule:
     interval: weekly
   open-pull-requests-limit: 10
+  groups:
+    cargo-dependencies:
+      patterns:
+      - "*"
+      update-types:
+      - "minor"
+      - "patch"
