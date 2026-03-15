@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 csv = "1.4"
 rust_decimal = "1.40"
 chrono = "0.4"
@@ -14,7 +14,7 @@ thiserror = "2.0.18"
 ratatui = "0.30"
 tui-input = "0.15"
 directories = "6.0"
-config = { version = "0.15.19", features = ["toml"] }
+config = { version = "0.15.21", features = ["toml"] }
 
 [dev-dependencies]
 insta = { version = "1.46.1", features = ["filters"] }
