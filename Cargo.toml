@@ -14,7 +14,7 @@ thiserror = "2.0.18"
 ratatui = "0.30"
 tui-input = "0.15"
 directories = "6.0"
-config = { version = "0.15.21", features = ["toml"] }
+config = { version = "0.15.22", features = ["toml"] }
 
 [dev-dependencies]
 insta = { version = "1.46.1", features = ["filters"] }
