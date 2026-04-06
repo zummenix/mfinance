@@ -17,6 +17,6 @@ directories = "6.0"
 config = { version = "0.15.22", features = ["toml"] }
 
 [dev-dependencies]
-insta = { version = "1.47.1", features = ["filters"] }
+insta = { version = "1.47.2", features = ["filters"] }
 insta-cmd = "0.6.0"
 temp-dir = "0.2.0"

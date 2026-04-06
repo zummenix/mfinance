@@ -899,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.47.1"
+version = "1.47.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99322078b2c076829a1db959d49da554fabc4342257fc0ba5a070a1eb3a01cd8"
+checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
 dependencies = [
  "console",
  "once_cell",
@@ -2148,9 +2148,9 @@ dependencies = [
 
 [[package]]
 name = "tui-input"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79c1ee964298f136020f5f69e0e601f4d3a1f610a7baf1af9fcb96152e8a2c45"
+checksum = "932708e36347b2a0c4784b405c85b7a3d2f937f16660f37e2776b040fe680632"
 dependencies = [
  "ratatui",
  "unicode-width",
