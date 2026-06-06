@@ -10,7 +10,7 @@
 ## Snapshot tests
 
 - The test suite uses the `insta` crate.
-- If snapshots need updates, use `cargo insta accept`.
+- If snapshots need updates, use `cargo insta accept` (requires `cargo install cargo-insta`).
 - Prefer **inline insta snapshots** when adding or updating snapshot assertions.
 
 ## Baseline quality contract
