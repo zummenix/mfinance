@@ -641,11 +641,12 @@ fn ui(frame: &mut Frame, app: &mut App) {
     // Years list (middle column)
     let years_width = years_rect.width.saturating_sub(2) as usize; // Account for block borders
     let years_list = List::new(app.report.year_reports.iter().enumerate().map(|(i, year)| {
-        let amount = match app.view_mode {
-            ViewMode::Total => year.subtotal_amount.clone(),
-            ViewMode::DebitCredit => year
-                .subtotal_debit_credit
-                .display(app.report.year_credit_width),
+        let amount: std::borrow::Cow<'_, str> = match app.view_mode {
+            ViewMode::Total => std::borrow::Cow::Borrowed(year.subtotal_amount.as_str()),
+            ViewMode::DebitCredit => std::borrow::Cow::Owned(
+                year.subtotal_debit_credit
+                    .display(app.report.year_credit_width),
+            ),
         };
         ListItem::new(make_line(
             &year.title,
