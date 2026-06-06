@@ -218,16 +218,15 @@ impl ReportViewModel {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let entries = entries_from_file(&file.path)?;
         let total: Decimal = entries.iter().map(|entry| entry.amount).sum();
-        let (debit, credit) = entries.iter().fold(
-            (Decimal::ZERO, Decimal::ZERO),
-            |(d, c), e| {
+        let (debit, credit) = entries
+            .iter()
+            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
                 if e.amount > Decimal::ZERO {
                     (d + e.amount, c)
                 } else {
                     (d, c + e.amount)
                 }
-            },
-        );
+            });
         let mut years_map: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
         for entry in entries {
             let date: NaiveDate = entry.date.parse()?;
@@ -246,16 +245,16 @@ impl ReportViewModel {
                 .into_iter()
                 .map(|(year, entries)| {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
-                    let (subtotal_debit, subtotal_credit) = entries.iter().fold(
-                        (Decimal::ZERO, Decimal::ZERO),
-                        |(d, c), e| {
-                            if e.amount > Decimal::ZERO {
-                                (d + e.amount, c)
-                            } else {
-                                (d, c + e.amount)
-                            }
-                        },
-                    );
+                    let (subtotal_debit, subtotal_credit) =
+                        entries
+                            .iter()
+                            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
+                                if e.amount > Decimal::ZERO {
+                                    (d + e.amount, c)
+                                } else {
+                                    (d, c + e.amount)
+                                }
+                            });
                     let lines: Vec<(String, String)> = entries
                         .iter()
                         .map(|entry| (entry.day_month_date(), entry.amount.format(format_options)))
