@@ -40,6 +40,14 @@ impl TuiTestFixture {
         .expect("write savings.csv");
         files.push(file3_path);
 
+        let file4_path = tempdir.child("hustle.csv");
+        fs::write(
+            &file4_path,
+            "date;amount\n2024-01-10;4.00\n2024-01-20;-3.00\n",
+        )
+        .expect("write hustle.csv");
+        files.push(file4_path);
+
         TuiTestFixture {
             tempdir,
             files,
@@ -115,6 +123,10 @@ fn press_close_popup() -> Vec<Event> {
     vec![key_event(KeyCode::Char('q'))]
 }
 
+fn press_m() -> Vec<Event> {
+    vec![key_event(KeyCode::Char('m'))]
+}
+
 fn type_text(s: &str) -> Vec<Event> {
     s.chars().map(|ch| key_event(KeyCode::Char(ch))).collect()
 }
@@ -148,7 +160,7 @@ fn test_down_or_j() {
     "║ expenses.csv              ║│▎2024            1 500.00 ││ June 15            500.00 │"
     "║ income.csv                ║│                          ││▎December 31      1 000.00 │"
     "║▌savings.csv      1 500.00 ║│                          ││                           │"
-    "║                           ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -162,7 +174,7 @@ fn test_down_or_j() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -174,11 +186,11 @@ fn test_up_or_k() {
     let output = fixture.run_with_events(vec![type_text("k"), press_up()]);
 
     assert_snapshot!(output, @r#"
-    "╔ Files ════════════════════╗┌ income.csv ──────────────┐┌ 2025 ─────────────────────┐"
-    "║ expenses.csv              ║│ 2024            6 000.00 ││▎January 1        2 000.00 │"
-    "║▌income.csv       8 000.00 ║│▎2025            2 000.00 ││                           │"
-    "║ savings.csv               ║│                          ││                           │"
-    "║                           ║│                          ││                           │"
+    "╔ Files ════════════════════╗┌ savings.csv ─────────────┐┌ 2024 ─────────────────────┐"
+    "║ expenses.csv              ║│▎2024            1 500.00 ││ June 15            500.00 │"
+    "║ income.csv                ║│                          ││▎December 31      1 000.00 │"
+    "║▌savings.csv      1 500.00 ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -192,7 +204,7 @@ fn test_up_or_k() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -207,7 +219,7 @@ fn test_focus_on_years() {
     "│▎expenses.csv      -251.50 │║ 2024             -175.75 ║│▎January 5          -75.75 │"
     "│ income.csv                │║▌2025              -75.75 ║│                           │"
     "│ savings.csv               │║                          ║│                           │"
-    "│                           │║                          ║│                           │"
+    "│ hustle.csv                │║                          ║│                           │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
@@ -221,7 +233,7 @@ fn test_focus_on_years() {
     "│                           │║                          ║│                           │"
     "└───────────────────────────┘╚══════════════════════════╝└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -236,7 +248,7 @@ fn test_focus_on_entries() {
     "│▎expenses.csv      -251.50 ││ 2024             -175.75 │║▌January 5          -75.75 ║"
     "│ income.csv                ││▎2025              -75.75 │║                           ║"
     "│ savings.csv               ││                          │║                           ║"
-    "│                           ││                          │║                           ║"
+    "│ hustle.csv                ││                          │║                           ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
@@ -250,7 +262,7 @@ fn test_focus_on_entries() {
     "│                           ││                          │║                           ║"
     "└───────────────────────────┘└──────────────────────────┘╚═══════════════════════════╝"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -265,7 +277,7 @@ fn test_cycle_back_focus_on_files() {
     "║▌expenses.csv      -251.50 ║│ 2024             -175.75 ││▎January 5          -75.75 │"
     "║ income.csv                ║│▎2025              -75.75 ││                           │"
     "║ savings.csv               ║│                          ││                           │"
-    "║                           ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -279,7 +291,7 @@ fn test_cycle_back_focus_on_files() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -296,7 +308,7 @@ fn test_years_navigation() {
     "│▎expenses.csv      -251.50 │║▌2024             -175.75 ║│ January 15         -50.25 │"
     "│ income.csv                │║ 2025              -75.75 ║│ February 20       -100.00 │"
     "│ savings.csv               │║                          ║│▎March 10           -25.50 │"
-    "│                           │║                          ║│                           │"
+    "│ hustle.csv                │║                          ║│                           │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
     "│                           │║                          ║│                           │"
@@ -310,7 +322,7 @@ fn test_years_navigation() {
     "│                           │║                          ║│                           │"
     "└───────────────────────────┘╚══════════════════════════╝└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -334,7 +346,7 @@ fn test_entries_navigation() {
     "│▎expenses.csv      -251.50 ││▎2024             -175.75 │║▌January 15         -50.25 ║"
     "│ income.csv                ││ 2025              -75.75 │║ February 20       -100.00 ║"
     "│ savings.csv               ││                          │║ March 10           -25.50 ║"
-    "│                           ││                          │║                           ║"
+    "│ hustle.csv                ││                          │║                           ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
     "│                           ││                          │║                           ║"
@@ -348,7 +360,7 @@ fn test_entries_navigation() {
     "│                           ││                          │║                           ║"
     "└───────────────────────────┘└──────────────────────────┘╚═══════════════════════════╝"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -368,7 +380,7 @@ fn test_add_entry_popup_open() {
         "│▎expenses.csv      -251.50 ││ 2024             -175.75 ││▎January 5          -75.75 │"
         "│ income.csv                ││▎2025              -75.75 ││                           │"
         "│ savings.csv               ││                          ││                           │"
-        "│                           ││                          ││                           │"
+        "│ hustle.csv                ││                          ││                           │"
         "│                           ││                          ││                           │"
         "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
         "│                ║ File    expenses.csv                             ║                │"
@@ -401,7 +413,7 @@ fn test_edit_entry_popup_open() {
     "│ expenses.csv              ││ 2024            6 000.00 ││▎January 1        2 000.00 │"
     "│▎income.csv       8 000.00 ││▎2025            2 000.00 ││                           │"
     "│ savings.csv               ││                          ││                           │"
-    "│                           ││                          ││                           │"
+    "│ hustle.csv                ││                          ││                           │"
     "│                           ││                          ││                           │"
     "│                ╔ Edit Entry ══════════════════════════════════════╗                │"
     "│                ║ File    income.csv                               ║                │"
@@ -443,7 +455,7 @@ fn test_popup_input_and_focus() {
     "│▎expenses.csv      -251.50 ││ 2024             -175.75 ││▎January 5          -75.75 │"
     "│ income.csv                ││▎2025              -75.75 ││                           │"
     "│ savings.csv               ││                          ││                           │"
-    "│                           ││                          ││                           │"
+    "│ hustle.csv                ││                          ││                           │"
     "│                           ││                          ││                           │"
     "│                ╔ Edit Entry ══════════════════════════════════════╗                │"
     "│                ║ File    expenses.csv                             ║                │"
@@ -473,7 +485,7 @@ fn test_popup_close() {
     "║▌expenses.csv      -251.50 ║│ 2024             -175.75 ││▎January 5          -75.75 │"
     "║ income.csv                ║│▎2025              -75.75 ││                           │"
     "║ savings.csv               ║│                          ││                           │"
-    "║                           ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -487,7 +499,7 @@ fn test_popup_close() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit                    │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -554,7 +566,7 @@ fn test_popup_error_handling() {
     "│▎expenses.csv      -251.50 ││ 2024             -175.75 ││▎January 5          -75.75 │"
     "│ income.csv                ││▎2025              -75.75 ││                           │"
     "│ savings.csv               ││                          ││                           │"
-    "│                           ││                          ││                           │"
+    "│ hustle.csv                ││                          ││                           │"
     "│                           ││                          ││                           │"
     "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
     "│                ║ File    expenses.csv                             ║                │"
@@ -600,7 +612,7 @@ fn test_popup_error_clearing() {
     "│▎expenses.csv      -251.50 ││ 2024             -175.75 ││▎January 5          -75.75 │"
     "│ income.csv                ││▎2025              -75.75 ││                           │"
     "│ savings.csv               ││                          ││                           │"
-    "│                           ││                          ││                           │"
+    "│ hustle.csv                ││                          ││                           │"
     "│                           ││                          ││                           │"
     "│                ╔ Add New Entry ═══════════════════════════════════╗                │"
     "│                ║ File    expenses.csv                             ║                │"
@@ -617,4 +629,16 @@ fn test_popup_error_clearing() {
     "│Tab: Switch Field | Enter: Save | q: Cancel                                         │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
+}
+
+#[test]
+fn test_debit_credit_view() {
+    let fixture = TuiTestFixture::new();
+
+    // Navigate to hustle.csv (4th file, index 3) and switch to debit/credit mode
+    let to_hustle = repeat(press_down(), 3);
+    let switch_mode = press_m();
+    let output = fixture.run_with_events(vec![to_hustle, switch_mode]);
+
+    assert_snapshot!(output);
 }
