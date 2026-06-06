@@ -612,18 +612,19 @@ fn ui(frame: &mut Frame, app: &mut App) {
         .areas(main_rect);
 
     let files_width = files_rect.width.saturating_sub(2) as usize; // Account for block borders
-    let file_display_amount = match app.view_mode {
-        ViewMode::Total => app.report.total.clone(),
-        ViewMode::DebitCredit => app
-            .report
-            .debit_credit
-            .display(app.report.debit_credit.credit_width()),
+    let file_display_amount: std::borrow::Cow<'_, str> = match app.view_mode {
+        ViewMode::Total => std::borrow::Cow::Borrowed(app.report.total.as_str()),
+        ViewMode::DebitCredit => std::borrow::Cow::Owned(
+            app.report
+                .debit_credit
+                .display(app.report.debit_credit.credit_width()),
+        ),
     };
     let files = app.files.iter().enumerate().map(|(i, file)| {
         ListItem::new(make_line(
             &file.name,
             if i == app.selection.file {
-                file_display_amount.as_str()
+                file_display_amount.as_ref()
             } else {
                 ""
             },
