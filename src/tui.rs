@@ -81,6 +81,9 @@ where
                         KeyCode::Tab => {
                             app.cycle_focus();
                         }
+                        KeyCode::Char('m') => {
+                            app.toggle_view_mode();
+                        }
                         _ => {}
                     }
                 }
@@ -144,6 +147,12 @@ enum PopupMode {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+enum ViewMode {
+    Total,
+    DebitCredit,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum PopupFocus {
     Date,
     Amount,
@@ -155,6 +164,7 @@ struct App {
     report: ReportViewModel,
     selection: Selection,
     focus: Focus,
+    view_mode: ViewMode,
     popup: Popup,
 }
 
@@ -189,12 +199,14 @@ struct Selection {
 struct ReportViewModel {
     title: String,
     total: String,
+    debit_credit: String,
     year_reports: Vec<YearReportViewModel>,
 }
 
 struct YearReportViewModel {
     title: String,
     subtotal_amount: String,
+    subtotal_debit_credit: String,
     lines: Vec<(String, String)>,
     entries: Vec<Entry>, // Store raw entries for editing
 }
@@ -206,6 +218,15 @@ impl ReportViewModel {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let entries = entries_from_file(&file.path)?;
         let total: Decimal = entries.iter().map(|entry| entry.amount).sum();
+        let (debit, credit) = entries
+            .iter()
+            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
+                if e.amount > Decimal::ZERO {
+                    (d + e.amount, c)
+                } else {
+                    (d, c + e.amount)
+                }
+            });
         let mut years_map: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
         for entry in entries {
             let date: NaiveDate = entry.date.parse()?;
@@ -215,10 +236,25 @@ impl ReportViewModel {
         Ok(ReportViewModel {
             title: file.name.clone(),
             total: total.format(format_options),
+            debit_credit: format!(
+                "{} | {}",
+                debit.format(format_options),
+                credit.format(format_options)
+            ),
             year_reports: years_map
                 .into_iter()
                 .map(|(year, entries)| {
                     let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
+                    let (subtotal_debit, subtotal_credit) =
+                        entries
+                            .iter()
+                            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
+                                if e.amount > Decimal::ZERO {
+                                    (d + e.amount, c)
+                                } else {
+                                    (d, c + e.amount)
+                                }
+                            });
                     let lines: Vec<(String, String)> = entries
                         .iter()
                         .map(|entry| (entry.day_month_date(), entry.amount.format(format_options)))
@@ -226,6 +262,11 @@ impl ReportViewModel {
                     YearReportViewModel {
                         title: year,
                         subtotal_amount: subtotal_amount.format(format_options),
+                        subtotal_debit_credit: format!(
+                            "{} | {}",
+                            subtotal_debit.format(format_options),
+                            subtotal_credit.format(format_options)
+                        ),
                         lines,
                         entries,
                     }
@@ -259,6 +300,7 @@ impl App {
             files,
             config,
             focus: Focus::Files,
+            view_mode: ViewMode::Total,
             report: ReportViewModel::default(),
             selection: Selection::default(),
             popup: Popup::new(),
@@ -274,6 +316,13 @@ impl App {
             Focus::Files => Focus::Years,
             Focus::Years => Focus::YearDetails,
             Focus::YearDetails => Focus::Files,
+        };
+    }
+
+    fn toggle_view_mode(&mut self) {
+        self.view_mode = match self.view_mode {
+            ViewMode::Total => ViewMode::DebitCredit,
+            ViewMode::DebitCredit => ViewMode::Total,
         };
     }
 
@@ -519,11 +568,15 @@ fn ui(frame: &mut Frame, app: &mut App) {
         .areas(main_rect);
 
     let files_width = files_rect.width.saturating_sub(2) as usize; // Account for block borders
+    let file_display_amount = match app.view_mode {
+        ViewMode::Total => &app.report.total,
+        ViewMode::DebitCredit => &app.report.debit_credit,
+    };
     let files = app.files.iter().enumerate().map(|(i, file)| {
         ListItem::new(make_line(
             &file.name,
             if i == app.selection.file {
-                &app.report.total
+                file_display_amount
             } else {
                 ""
             },
@@ -541,9 +594,13 @@ fn ui(frame: &mut Frame, app: &mut App) {
     // Years list (middle column)
     let years_width = years_rect.width.saturating_sub(2) as usize; // Account for block borders
     let years_list = List::new(app.report.year_reports.iter().enumerate().map(|(i, year)| {
+        let amount = match app.view_mode {
+            ViewMode::Total => &year.subtotal_amount,
+            ViewMode::DebitCredit => &year.subtotal_debit_credit,
+        };
         ListItem::new(make_line(
             &year.title,
-            &year.subtotal_amount,
+            amount,
             i == app.selection.year,
             app.focus == Focus::Years && app.popup.mode == PopupMode::None,
             years_width,
@@ -575,7 +632,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_stateful_widget(entries_list, entries_rect, &mut ListState::default());
 
     let footer_text = if app.popup.mode == PopupMode::None {
-        "↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | q: Quit"
+        "↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit"
     } else {
         "Tab: Switch Field | Enter: Save | q: Cancel"
     };
