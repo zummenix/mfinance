@@ -199,14 +199,46 @@ struct Selection {
 struct ReportViewModel {
     title: String,
     total: String,
-    debit_credit: String,
+    debit_credit: DebitCreditAmount,
+    year_credit_width: usize,
     year_reports: Vec<YearReportViewModel>,
+}
+
+#[derive(Default)]
+struct DebitCreditAmount {
+    debit: String,
+    credit: String,
+}
+
+impl DebitCreditAmount {
+    fn new(debit: Decimal, credit: Decimal, format_options: &FormatOptions) -> Self {
+        Self {
+            debit: if debit.is_zero() {
+                String::new()
+            } else {
+                debit.format(format_options)
+            },
+            credit: if credit.is_zero() {
+                String::new()
+            } else {
+                credit.format(format_options)
+            },
+        }
+    }
+
+    fn credit_width(&self) -> usize {
+        Span::raw(self.credit.as_str()).width()
+    }
+
+    fn display(&self, credit_width: usize) -> String {
+        format!("{} | {:<credit_width$}", self.debit, self.credit)
+    }
 }
 
 struct YearReportViewModel {
     title: String,
     subtotal_amount: String,
-    subtotal_debit_credit: String,
+    subtotal_debit_credit: DebitCreditAmount,
     lines: Vec<(String, String)>,
     entries: Vec<Entry>, // Store raw entries for editing
 }
@@ -236,11 +268,7 @@ impl ReportViewModel {
         Ok(ReportViewModel {
             title: file.name.clone(),
             total: total.format(format_options),
-            debit_credit: format!(
-                "{} | {}",
-                debit.format(format_options),
-                credit.format(format_options)
-            ),
+            debit_credit: DebitCreditAmount::new(debit, credit, format_options),
             year_reports: years_map
                 .into_iter()
                 .map(|(year, entries)| {
@@ -262,17 +290,31 @@ impl ReportViewModel {
                     YearReportViewModel {
                         title: year,
                         subtotal_amount: subtotal_amount.format(format_options),
-                        subtotal_debit_credit: format!(
-                            "{} | {}",
-                            subtotal_debit.format(format_options),
-                            subtotal_credit.format(format_options)
+                        subtotal_debit_credit: DebitCreditAmount::new(
+                            subtotal_debit,
+                            subtotal_credit,
+                            format_options,
                         ),
                         lines,
                         entries,
                     }
                 })
                 .collect(),
-        })
+            year_credit_width: 0,
+        }
+        .with_year_credit_width())
+    }
+}
+
+impl ReportViewModel {
+    fn with_year_credit_width(mut self) -> Self {
+        self.year_credit_width = self
+            .year_reports
+            .iter()
+            .map(|year| year.subtotal_debit_credit.credit_width())
+            .max()
+            .unwrap_or(0);
+        self
     }
 }
 
@@ -569,14 +611,17 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     let files_width = files_rect.width.saturating_sub(2) as usize; // Account for block borders
     let file_display_amount = match app.view_mode {
-        ViewMode::Total => &app.report.total,
-        ViewMode::DebitCredit => &app.report.debit_credit,
+        ViewMode::Total => app.report.total.clone(),
+        ViewMode::DebitCredit => app
+            .report
+            .debit_credit
+            .display(app.report.debit_credit.credit_width()),
     };
     let files = app.files.iter().enumerate().map(|(i, file)| {
         ListItem::new(make_line(
             &file.name,
             if i == app.selection.file {
-                file_display_amount
+                file_display_amount.as_str()
             } else {
                 ""
             },
@@ -595,8 +640,10 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let years_width = years_rect.width.saturating_sub(2) as usize; // Account for block borders
     let years_list = List::new(app.report.year_reports.iter().enumerate().map(|(i, year)| {
         let amount = match app.view_mode {
-            ViewMode::Total => &year.subtotal_amount,
-            ViewMode::DebitCredit => &year.subtotal_debit_credit,
+            ViewMode::Total => year.subtotal_amount.clone(),
+            ViewMode::DebitCredit => year
+                .subtotal_debit_credit
+                .display(app.report.year_credit_width),
         };
         ListItem::new(make_line(
             &year.title,
@@ -784,7 +831,7 @@ fn make_block(title: &str, is_focused: bool) -> Block<'_> {
 
 fn make_line<'a>(
     left: impl Into<std::borrow::Cow<'a, str>>,
-    right: &'a str,
+    right: impl Into<std::borrow::Cow<'a, str>>,
     is_selected: bool,
     is_focused: bool,
     width: usize,

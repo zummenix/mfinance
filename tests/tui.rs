@@ -43,7 +43,7 @@ impl TuiTestFixture {
         let file4_path = tempdir.child("hustle.csv");
         fs::write(
             &file4_path,
-            "date;amount\n2024-01-10;4.00\n2024-01-20;-3.00\n",
+            "date;amount\n2023-01-10;4.00\n2023-01-20;-3.00\n2024-01-10;7.00\n2024-01-20;-10.00\n",
         )
         .expect("write hustle.csv");
         files.push(file4_path);
@@ -642,10 +642,71 @@ fn test_debit_credit_view() {
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ hustle.csv ──────────────┐┌ 2024 ─────────────────────┐"
-    "║ expenses.csv              ║│▎2024        4.00 | -3.00 ││ January 10           4.00 │"
-    "║ income.csv                ║│                          ││▎January 20          -3.00 │"
+    "║ expenses.csv              ║│ 2023       4.00 | -3.00  ││ January 10           7.00 │"
+    "║ income.csv                ║│▎2024       7.00 | -10.00 ││▎January 20         -10.00 │"
     "║ savings.csv               ║│                          ││                           │"
-    "║▌hustle.csv   4.00 | -3.00 ║│                          ││                           │"
+    "║▌hustle.csv 11.00 | -13.00 ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
+}
+
+#[test]
+fn test_debit_credit_view_hides_zero_debit() {
+    let fixture = TuiTestFixture::new();
+
+    let output = fixture.run_with_events(vec![press_m()]);
+
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐"
+    "║▌expenses.csv    | -251.50 ║│ 2024           | -175.75 ││▎January 5          -75.75 │"
+    "║ income.csv                ║│▎2025           | -75.75  ││                           │"
+    "║ savings.csv               ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "║                           ║│                          ││                           │"
+    "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
+    "┌────────────────────────────────────────────────────────────────────────────────────┐"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "└────────────────────────────────────────────────────────────────────────────────────┘"
+    "#);
+}
+
+#[test]
+fn test_debit_credit_view_hides_zero_credit() {
+    let fixture = TuiTestFixture::new();
+
+    let to_savings = repeat(press_down(), 2);
+    let output = fixture.run_with_events(vec![to_savings, press_m()]);
+
+    assert_snapshot!(output, @r#"
+    "╔ Files ════════════════════╗┌ savings.csv ─────────────┐┌ 2024 ─────────────────────┐"
+    "║ expenses.csv              ║│▎2024         1 500.00 |  ││ June 15            500.00 │"
+    "║ income.csv                ║│                          ││▎December 31      1 000.00 │"
+    "║▌savings.csv   1 500.00 |  ║│                          ││                           │"
+    "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"
