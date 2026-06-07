@@ -123,8 +123,8 @@ fn press_close_popup() -> Vec<Event> {
     vec![key_event(KeyCode::Char('q'))]
 }
 
-fn press_m() -> Vec<Event> {
-    vec![key_event(KeyCode::Char('m'))]
+fn press_v() -> Vec<Event> {
+    vec![key_event(KeyCode::Char('v'))]
 }
 
 fn type_text(s: &str) -> Vec<Event> {
@@ -174,7 +174,7 @@ fn test_down_or_j() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -204,7 +204,7 @@ fn test_up_or_k() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -233,7 +233,7 @@ fn test_focus_on_years() {
     "│                           │║                          ║│                           │"
     "└───────────────────────────┘╚══════════════════════════╝└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -262,7 +262,7 @@ fn test_focus_on_entries() {
     "│                           ││                          │║                           ║"
     "└───────────────────────────┘└──────────────────────────┘╚═══════════════════════════╝"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -291,7 +291,7 @@ fn test_cycle_back_focus_on_files() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -322,7 +322,7 @@ fn test_years_navigation() {
     "│                           │║                          ║│                           │"
     "└───────────────────────────┘╚══════════════════════════╝└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -360,7 +360,7 @@ fn test_entries_navigation() {
     "│                           ││                          │║                           ║"
     "└───────────────────────────┘└──────────────────────────┘╚═══════════════════════════╝"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -499,7 +499,7 @@ fn test_popup_close() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -637,7 +637,7 @@ fn test_debit_credit_view() {
 
     // Navigate to hustle.csv (4th file, index 3) and switch to debit/credit mode
     let to_hustle = repeat(press_down(), 3);
-    let switch_mode = press_m();
+    let switch_mode = press_v();
     let output = fixture.run_with_events(vec![to_hustle, switch_mode]);
 
     assert_snapshot!(output, @r#"
@@ -659,7 +659,7 @@ fn test_debit_credit_view() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -668,7 +668,7 @@ fn test_debit_credit_view() {
 fn test_debit_credit_view_shows_zero_debit() {
     let fixture = TuiTestFixture::new();
 
-    let output = fixture.run_with_events(vec![press_m()]);
+    let output = fixture.run_with_events(vec![press_v()]);
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐"
@@ -689,7 +689,7 @@ fn test_debit_credit_view_shows_zero_debit() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }
@@ -699,7 +699,7 @@ fn test_debit_credit_view_shows_zero_credit() {
     let fixture = TuiTestFixture::new();
 
     let to_savings = repeat(press_down(), 2);
-    let output = fixture.run_with_events(vec![to_savings, press_m()]);
+    let output = fixture.run_with_events(vec![to_savings, press_v()]);
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ savings.csv ─────────────┐┌ 2024 ─────────────────────┐"
@@ -720,7 +720,7 @@ fn test_debit_credit_view_shows_zero_credit() {
     "║                           ║│                          ││                           │"
     "╚═══════════════════════════╝└──────────────────────────┘└───────────────────────────┘"
     "┌────────────────────────────────────────────────────────────────────────────────────┐"
-    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit          │"
+    "│↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit          │"
     "└────────────────────────────────────────────────────────────────────────────────────┘"
     "#);
 }

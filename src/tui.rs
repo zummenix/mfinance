@@ -139,7 +139,7 @@ const NORMAL_BINDINGS: &[KeyBinding] = &[
         action: KeyAction::CycleFocus,
     },
     KeyBinding {
-        code: KeyCode::Char('m'),
+        code: KeyCode::Char('v'),
         action: KeyAction::ToggleViewMode,
     },
 ];
@@ -707,7 +707,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_stateful_widget(entries_list, entries_rect, &mut ListState::default());
 
     let footer_text = if app.popup.mode == PopupMode::None {
-        "↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | m: Mode | q: Quit"
+        "↓(j)/↑(k): Navigate | Tab: Focus | n/e: New/Edit Entry | v: View | q: Quit"
     } else {
         "Tab: Switch Field | Enter: Save | q: Cancel"
     };
