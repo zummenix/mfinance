@@ -7,6 +7,11 @@
 - **CLI** (`src/main.rs`): command-based interface for adding entries, reporting, and sorting CSV data.
 - **TUI** (`src/tui.rs`): interactive terminal UI for browsing files, years, entries, and editing data.
 
+## Useful commands during development
+
+- `cargo check --all` can be run for a quick check
+- `cargo fmt --all` runs the formatter
+
 ## Snapshot tests
 
 - The test suite uses the `insta` crate.
