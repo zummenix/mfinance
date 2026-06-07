@@ -26,6 +26,7 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 const FOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x001a1e24);
 const UNFOCUSED_SELECTION_BG_COLOR: Color = Color::from_u32(0x00232730);
 const SELECTION_INDICATOR_COLOR: Color = Color::Green;
+const FIXED_PADDING_WIDTH: usize = 2;
 
 /// Core TUI loop that works with any backend and event source
 ///
@@ -55,56 +56,27 @@ where
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
-            match app.popup.mode {
-                PopupMode::None => {
-                    // Normal navigation mode
-                    match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Char('n') => {
-                            app.open_add_entry_popup();
-                        }
-                        KeyCode::Char('e') => {
-                            app.open_edit_entry_popup();
-                        }
-                        KeyCode::Down => {
-                            app.next();
-                        }
-                        KeyCode::Char('j') => {
-                            app.next();
-                        }
-                        KeyCode::Up => {
-                            app.previous();
-                        }
-                        KeyCode::Char('k') => {
-                            app.previous();
-                        }
-                        KeyCode::Tab => {
-                            app.cycle_focus();
-                        }
-                        KeyCode::Char('m') => {
-                            app.toggle_view_mode();
-                        }
-                        _ => {}
-                    }
+            let bindings: &[KeyBinding] = match app.popup.mode {
+                PopupMode::None => NORMAL_BINDINGS,
+                _ => POPUP_BINDINGS,
+            };
+            if let Some(binding) = bindings.iter().find(|b| b.code == key.code) {
+                match binding.action {
+                    KeyAction::Quit => break,
+                    KeyAction::Next => app.next(),
+                    KeyAction::Previous => app.previous(),
+                    KeyAction::CycleFocus => app.cycle_focus(),
+                    KeyAction::ToggleViewMode => app.toggle_view_mode(),
+                    KeyAction::NewEntry => app.open_add_entry_popup(),
+                    KeyAction::EditEntry => app.open_edit_entry_popup(),
+                    KeyAction::ClosePopup => app.close_popup(),
+                    KeyAction::CyclePopupFocus => app.cycle_popup_focus(),
+                    KeyAction::SavePopup => app.handle_saving_popup_entry(),
                 }
-                PopupMode::AddEntry | PopupMode::EditEntry => {
-                    // Popup input mode
-                    match key.code {
-                        KeyCode::Char('q') => {
-                            app.close_popup();
-                        }
-                        KeyCode::Tab => {
-                            app.cycle_popup_focus();
-                        }
-                        KeyCode::Enter => {
-                            app.handle_saving_popup_entry();
-                        }
-                        KeyCode::Backspace | KeyCode::Char(_) => {
-                            app.handle_popup_input(key);
-                        }
-                        _ => {}
-                    }
-                }
+            } else if app.popup.mode != PopupMode::None
+                && matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
+            {
+                app.handle_popup_input(key);
             }
         }
 
@@ -114,6 +86,78 @@ where
 
     Ok(())
 }
+
+struct KeyBinding {
+    code: KeyCode,
+    action: KeyAction,
+}
+
+enum KeyAction {
+    Quit,
+    Next,
+    Previous,
+    CycleFocus,
+    ToggleViewMode,
+    NewEntry,
+    EditEntry,
+    ClosePopup,
+    CyclePopupFocus,
+    SavePopup,
+}
+
+const NORMAL_BINDINGS: &[KeyBinding] = &[
+    KeyBinding {
+        code: KeyCode::Char('q'),
+        action: KeyAction::Quit,
+    },
+    KeyBinding {
+        code: KeyCode::Char('n'),
+        action: KeyAction::NewEntry,
+    },
+    KeyBinding {
+        code: KeyCode::Char('e'),
+        action: KeyAction::EditEntry,
+    },
+    KeyBinding {
+        code: KeyCode::Down,
+        action: KeyAction::Next,
+    },
+    KeyBinding {
+        code: KeyCode::Char('j'),
+        action: KeyAction::Next,
+    },
+    KeyBinding {
+        code: KeyCode::Up,
+        action: KeyAction::Previous,
+    },
+    KeyBinding {
+        code: KeyCode::Char('k'),
+        action: KeyAction::Previous,
+    },
+    KeyBinding {
+        code: KeyCode::Tab,
+        action: KeyAction::CycleFocus,
+    },
+    KeyBinding {
+        code: KeyCode::Char('m'),
+        action: KeyAction::ToggleViewMode,
+    },
+];
+
+const POPUP_BINDINGS: &[KeyBinding] = &[
+    KeyBinding {
+        code: KeyCode::Char('q'),
+        action: KeyAction::ClosePopup,
+    },
+    KeyBinding {
+        code: KeyCode::Tab,
+        action: KeyAction::CyclePopupFocus,
+    },
+    KeyBinding {
+        code: KeyCode::Enter,
+        action: KeyAction::SavePopup,
+    },
+];
 
 pub fn run_tui(files: Vec<PathBuf>, config: Config) -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
@@ -213,16 +257,8 @@ struct DebitCreditAmount {
 impl DebitCreditAmount {
     fn new(debit: Decimal, credit: Decimal, format_options: &FormatOptions) -> Self {
         Self {
-            debit: if debit.is_zero() {
-                String::new()
-            } else {
-                debit.format(format_options)
-            },
-            credit: if credit.is_zero() {
-                String::new()
-            } else {
-                credit.format(format_options)
-            },
+            debit: format_or_blank(debit, format_options),
+            credit: format_or_blank(credit, format_options),
         }
     }
 
@@ -235,6 +271,26 @@ impl DebitCreditAmount {
         let pad = " ".repeat(credit_width.saturating_sub(actual_width));
         format!("{} | {}{}", self.debit, self.credit, pad)
     }
+}
+
+fn format_or_blank(value: Decimal, format_options: &FormatOptions) -> String {
+    if value.is_zero() {
+        String::new()
+    } else {
+        value.format(format_options)
+    }
+}
+
+fn split_debit_credit(entries: &[Entry]) -> (Decimal, Decimal) {
+    entries
+        .iter()
+        .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
+            if e.amount > Decimal::ZERO {
+                (d + e.amount, c)
+            } else {
+                (d, c + e.amount)
+            }
+        })
 }
 
 struct YearReportViewModel {
@@ -252,71 +308,47 @@ impl ReportViewModel {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let entries = entries_from_file(&file.path)?;
         let total: Decimal = entries.iter().map(|entry| entry.amount).sum();
-        let (debit, credit) = entries
-            .iter()
-            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
-                if e.amount > Decimal::ZERO {
-                    (d + e.amount, c)
-                } else {
-                    (d, c + e.amount)
-                }
-            });
+        let (debit, credit) = split_debit_credit(&entries);
         let mut years_map: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
         for entry in entries {
             let date: NaiveDate = entry.date.parse()?;
             let year = date.year().to_string();
             years_map.entry(year).or_default().push(entry);
         }
-        Ok(ReportViewModel {
-            title: file.name.clone(),
-            total: total.format(format_options),
-            debit_credit: DebitCreditAmount::new(debit, credit, format_options),
-            year_reports: years_map
-                .into_iter()
-                .map(|(year, entries)| {
-                    let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
-                    let (subtotal_debit, subtotal_credit) =
-                        entries
-                            .iter()
-                            .fold((Decimal::ZERO, Decimal::ZERO), |(d, c), e| {
-                                if e.amount > Decimal::ZERO {
-                                    (d + e.amount, c)
-                                } else {
-                                    (d, c + e.amount)
-                                }
-                            });
-                    let lines: Vec<(String, String)> = entries
-                        .iter()
-                        .map(|entry| (entry.day_month_date(), entry.amount.format(format_options)))
-                        .collect();
-                    YearReportViewModel {
-                        title: year,
-                        subtotal_amount: subtotal_amount.format(format_options),
-                        subtotal_debit_credit: DebitCreditAmount::new(
-                            subtotal_debit,
-                            subtotal_credit,
-                            format_options,
-                        ),
-                        lines,
-                        entries,
-                    }
-                })
-                .collect(),
-            year_credit_width: 0,
-        }
-        .with_year_credit_width())
-    }
-}
-
-impl ReportViewModel {
-    fn with_year_credit_width(mut self) -> Self {
-        self.year_credit_width = self
-            .year_reports
+        let year_reports: Vec<YearReportViewModel> = years_map
+            .into_iter()
+            .map(|(year, entries)| {
+                let subtotal_amount: Decimal = entries.iter().map(|entry| entry.amount).sum();
+                let (subtotal_debit, subtotal_credit) = split_debit_credit(&entries);
+                let lines: Vec<(String, String)> = entries
+                    .iter()
+                    .map(|entry| (entry.day_month_date(), entry.amount.format(format_options)))
+                    .collect();
+                YearReportViewModel {
+                    title: year,
+                    subtotal_amount: subtotal_amount.format(format_options),
+                    subtotal_debit_credit: DebitCreditAmount::new(
+                        subtotal_debit,
+                        subtotal_credit,
+                        format_options,
+                    ),
+                    lines,
+                    entries,
+                }
+            })
+            .collect();
+        let year_credit_width = year_reports
             .iter()
             .map(|year| year.subtotal_debit_credit.credit_width())
             .max()
             .unwrap_or(0);
-        self
+        Ok(ReportViewModel {
+            title: file.name.clone(),
+            total: total.format(format_options),
+            debit_credit: DebitCreditAmount::new(debit, credit, format_options),
+            year_reports,
+            year_credit_width,
+        })
     }
 }
 
@@ -852,12 +884,8 @@ fn make_line<'a>(
     let padding_span_right = Span::raw(" ");
     let left_span = Span::raw(left);
     let right_span = Span::raw(right);
-    let spacer = " ".repeat(width.saturating_sub(
-        left_span.width()
-            + right_span.width()
-            + padding_span_left.width()
-            + padding_span_right.width(),
-    ));
+    let spacer = " "
+        .repeat(width.saturating_sub(left_span.width() + right_span.width() + FIXED_PADDING_WIDTH));
     let line = Line::from(vec![
         padding_span_left,
         left_span,
