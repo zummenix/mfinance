@@ -665,15 +665,15 @@ fn test_debit_credit_view() {
 }
 
 #[test]
-fn test_debit_credit_view_hides_zero_debit() {
+fn test_debit_credit_view_shows_zero_debit() {
     let fixture = TuiTestFixture::new();
 
     let output = fixture.run_with_events(vec![press_m()]);
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐"
-    "║▌expenses.csv    | -251.50 ║│ 2024           | -175.75 ││▎January 5          -75.75 │"
-    "║ income.csv                ║│▎2025           | -75.75  ││                           │"
+    "║▌expenses.csv0.00 | -251.50║│ 2024      0.00 | -175.75 ││▎January 5          -75.75 │"
+    "║ income.csv                ║│▎2025      0.00 | -75.75  ││                           │"
     "║ savings.csv               ║│                          ││                           │"
     "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
@@ -695,7 +695,7 @@ fn test_debit_credit_view_hides_zero_debit() {
 }
 
 #[test]
-fn test_debit_credit_view_hides_zero_credit() {
+fn test_debit_credit_view_shows_zero_credit() {
     let fixture = TuiTestFixture::new();
 
     let to_savings = repeat(press_down(), 2);
@@ -703,9 +703,9 @@ fn test_debit_credit_view_hides_zero_credit() {
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ savings.csv ─────────────┐┌ 2024 ─────────────────────┐"
-    "║ expenses.csv              ║│▎2024         1 500.00 |  ││ June 15            500.00 │"
+    "║ expenses.csv              ║│▎2024     1 500.00 | 0.00 ││ June 15            500.00 │"
     "║ income.csv                ║│                          ││▎December 31      1 000.00 │"
-    "║▌savings.csv   1 500.00 |  ║│                          ││                           │"
+    "║▌savings.csv1 500.00 | 0.00║│                          ││                           │"
     "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"
     "║                           ║│                          ││                           │"

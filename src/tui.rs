@@ -257,8 +257,8 @@ struct DebitCreditAmount {
 impl DebitCreditAmount {
     fn new(debit: Decimal, credit: Decimal, format_options: &FormatOptions) -> Self {
         Self {
-            debit: format_or_blank(debit, format_options),
-            credit: format_or_blank(credit, format_options),
+            debit: debit.format(format_options),
+            credit: credit.format(format_options),
         }
     }
 
@@ -270,14 +270,6 @@ impl DebitCreditAmount {
         let actual_width = Span::raw(self.credit.as_str()).width();
         let pad = " ".repeat(credit_width.saturating_sub(actual_width));
         format!("{} | {}{}", self.debit, self.credit, pad)
-    }
-}
-
-fn format_or_blank(value: Decimal, format_options: &FormatOptions) -> String {
-    if value.is_zero() {
-        String::new()
-    } else {
-        value.format(format_options)
     }
 }
 
