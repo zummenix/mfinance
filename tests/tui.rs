@@ -642,7 +642,7 @@ fn test_debit_credit_view() {
 
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ hustle.csv ──────────────┐┌ 2024 ─────────────────────┐"
-    "║ expenses.csv              ║│ 2023       4.00 | -3.00  ││ January 10           7.00 │"
+    "║ expenses.csv              ║│ 2023       4.00 |  -3.00 ││ January 10           7.00 │"
     "║ income.csv                ║│▎2024       7.00 | -10.00 ││▎January 20         -10.00 │"
     "║ savings.csv               ║│                          ││                           │"
     "║▌hustle.csv 11.00 | -13.00 ║│                          ││                           │"
@@ -673,7 +673,7 @@ fn test_debit_credit_view_shows_zero_debit() {
     assert_snapshot!(output, @r#"
     "╔ Files ════════════════════╗┌ expenses.csv ────────────┐┌ 2025 ─────────────────────┐"
     "║▌expenses.csv0.00 | -251.50║│ 2024      0.00 | -175.75 ││▎January 5          -75.75 │"
-    "║ income.csv                ║│▎2025      0.00 | -75.75  ││                           │"
+    "║ income.csv                ║│▎2025      0.00 |  -75.75 ││                           │"
     "║ savings.csv               ║│                          ││                           │"
     "║ hustle.csv                ║│                          ││                           │"
     "║                           ║│                          ││                           │"

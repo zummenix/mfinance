@@ -269,7 +269,7 @@ impl DebitCreditAmount {
     fn display(&self, credit_width: usize) -> String {
         let actual_width = Span::raw(self.credit.as_str()).width();
         let pad = " ".repeat(credit_width.saturating_sub(actual_width));
-        format!("{} | {}{}", self.debit, self.credit, pad)
+        format!("{} | {}{}", self.debit, pad, self.credit)
     }
 }
 
