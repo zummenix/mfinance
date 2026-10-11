@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -7,17 +7,40 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  fmt:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v7
-    - name: Build
-      run: cargo build --verbose
-    - name: Run Tests
-      run: cargo test --verbose
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-    - name: Clippy checks
-      run: cargo clippy -- -D warnings
+    - run: cargo fmt --all --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - run: cargo test --workspace --all-features
+
+  site-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+    - name: Install dependencies
+      working-directory: site/tests
+      run: npm install
+    - name: Run Playwright tests
+      working-directory: site/tests
+      run: npx playwright install --with-deps && npx playwright test
+
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - run: python3 -m unittest discover -s eval -t .
